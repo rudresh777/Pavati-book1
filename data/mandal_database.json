@@ -1,0 +1,255 @@
+{
+  "liveData": {
+    "donors": [
+      {
+        "id": "donor-seed-1",
+        "name": "श्री. राहुल वसंत कदम",
+        "mobile": "9822012345",
+        "address": "फ्लॅट क्र. ३०२, गणेश कृपा इमारत, शनिवार पेठ, पुणे",
+        "totalContributed": 5001,
+        "pavtiCount": 1,
+        "lastPaymentDate": "2026-08-15",
+        "createdAt": "2026-08-15T10:00:00.000Z",
+        "updatedAt": "2026-08-15T10:00:00.000Z"
+      },
+      {
+        "id": "donor-seed-2",
+        "name": "सौ. सुनिता प्रकाश जोशी",
+        "mobile": "9890123456",
+        "address": "घर क्र. १२, सदाशिव पेठ, पुणे",
+        "totalContributed": 2100,
+        "pavtiCount": 1,
+        "lastPaymentDate": "2026-08-15",
+        "createdAt": "2026-08-15T11:30:00.000Z",
+        "updatedAt": "2026-08-15T11:30:00.000Z"
+      }
+    ],
+    "payments": [
+      {
+        "id": "pay-seed-1",
+        "receiptNumber": "000001",
+        "donorId": "donor-seed-1",
+        "donorName": "श्री. राहुल वसंत कदम",
+        "donorMobile": "9822012345",
+        "donorAddress": "फ्लॅट क्र. ३०२, गणेश कृपा इमारत, शनिवार पेठ, पुणे",
+        "receivedAmount": 5001,
+        "expectedAmount": 5001,
+        "status": "PAID",
+        "paymentMethod": "UPI",
+        "transactionReference": "UPI/423589123456",
+        "notes": "वार्षिक गणेशोत्सव देणगी व महाप्रसाद",
+        "hostId": "host-1",
+        "hostName": "मंडळ प्रतिनिधी",
+        "date": "15/08/2026",
+        "timestamp": "2026-08-15T10:00:00.000Z",
+        "mode": "LIVE"
+      },
+      {
+        "id": "pay-seed-2",
+        "receiptNumber": "000002",
+        "donorId": "donor-seed-2",
+        "donorName": "सौ. सुनिता प्रकाश जोशी",
+        "donorMobile": "9890123456",
+        "donorAddress": "घर क्र. १२, सदाशिव पेठ, पुणे",
+        "receivedAmount": 2100,
+        "expectedAmount": 2100,
+        "status": "PAID",
+        "paymentMethod": "CASH",
+        "notes": "आरती वर्गणी",
+        "hostId": "host-1",
+        "hostName": "मंडळ प्रतिनिधी",
+        "date": "15/08/2026",
+        "timestamp": "2026-08-15T11:30:00.000Z",
+        "mode": "LIVE"
+      }
+    ],
+    "pavtis": [
+      {
+        "id": "pavti-seed-1",
+        "receiptNumber": "000001",
+        "paymentId": "pay-seed-1",
+        "donorName": "श्री. राहुल वसंत कदम",
+        "donorMobile": "9822012345",
+        "donorAddress": "फ्लॅट क्र. ३०२, गणेश कृपा इमारत, शनिवार पेठ, पुणे",
+        "amount": 5001,
+        "amountInWordsMarathi": "पाच हजार एक रुपये फक्त",
+        "amountInWordsEnglish": "Five Thousand One Rupees Only",
+        "paymentMethod": "UPI",
+        "transactionReference": "UPI/423589123456",
+        "date": "15/08/2026",
+        "year": "२०२६",
+        "mandalNameMarathi": "मोरया गणेशोत्सव मंडळ",
+        "mandalNameEnglish": "Morya Ganeshotsav Mandal",
+        "collectorName": "मंडळ प्रतिनिधी",
+        "collectorRole": "HOST",
+        "createdAt": "2026-08-15T10:00:00.000Z",
+        "mode": "LIVE"
+      },
+      {
+        "id": "pavti-seed-2",
+        "receiptNumber": "000002",
+        "paymentId": "pay-seed-2",
+        "donorName": "सौ. सुनिता प्रकाश जोशी",
+        "donorMobile": "9890123456",
+        "donorAddress": "घर क्र. १२, सदाशिव पेठ, पुणे",
+        "amount": 2100,
+        "amountInWordsMarathi": "दोन हजार एकशे रुपये फक्त",
+        "amountInWordsEnglish": "Two Thousand One Hundred Rupees Only",
+        "paymentMethod": "CASH",
+        "date": "15/08/2026",
+        "year": "२०२६",
+        "mandalNameMarathi": "मोरया गणेशोत्सव मंडळ",
+        "mandalNameEnglish": "Morya Ganeshotsav Mandal",
+        "collectorName": "मंडळ प्रतिनिधी",
+        "collectorRole": "HOST",
+        "createdAt": "2026-08-15T11:30:00.000Z",
+        "mode": "LIVE"
+      }
+    ],
+    "lastReceiptNumber": 2,
+    "auditLogs": [
+      {
+        "userId": "admin-1",
+        "userName": "सुपर ॲडमिन (Super Admin)",
+        "userRole": "SUPER_ADMIN",
+        "action": "USER_LOGIN",
+        "entityType": "USER",
+        "entityId": "admin-1",
+        "details": "SUPER_ADMIN (सुपर ॲडमिन (Super Admin)) logged in successfully.",
+        "mode": "LIVE",
+        "id": "audit-1786872828912-i8qe",
+        "timestamp": "2026-08-16T09:33:48.912Z"
+      },
+      {
+        "userId": "host-1",
+        "userName": "मंडळ प्रतिनिधी (Field Host)",
+        "userRole": "HOST",
+        "action": "USER_LOGIN",
+        "entityType": "USER",
+        "entityId": "host-1",
+        "details": "HOST (मंडळ प्रतिनिधी (Field Host)) logged in successfully.",
+        "mode": "LIVE",
+        "id": "audit-1786872848729-op03",
+        "timestamp": "2026-08-16T09:34:08.729Z"
+      },
+      {
+        "userId": "admin-1",
+        "userName": "सुपर ॲडमिन (Super Admin)",
+        "userRole": "SUPER_ADMIN",
+        "action": "USER_LOGIN",
+        "entityType": "USER",
+        "entityId": "admin-1",
+        "details": "SUPER_ADMIN (सुपर ॲडमिन (Super Admin)) logged in successfully.",
+        "mode": "LIVE",
+        "id": "audit-1786872887778-s352",
+        "timestamp": "2026-08-16T09:34:47.778Z"
+      },
+      {
+        "userId": "admin-1",
+        "userName": "सुपर ॲडमिन (Super Admin)",
+        "userRole": "SUPER_ADMIN",
+        "action": "USER_LOGIN",
+        "entityType": "USER",
+        "entityId": "admin-1",
+        "details": "SUPER_ADMIN (सुपर ॲडमिन (Super Admin)) logged in successfully.",
+        "mode": "LIVE",
+        "id": "audit-1786873828065-648t",
+        "timestamp": "2026-08-16T09:50:28.065Z"
+      }
+    ]
+  },
+  "testData": {
+    "donors": [],
+    "payments": [],
+    "pavtis": [],
+    "lastReceiptNumber": 0,
+    "auditLogs": []
+  },
+  "settings": {
+    "mandalNameMarathi": "मोरया गणेशोत्सव मंडळ",
+    "mandalNameEnglish": "Morya Ganeshotsav Mandal",
+    "regNumber": "महा/१२३४/२०२६",
+    "year": "२०२६",
+    "taglineMarathi": "॥ श्री गणेशाय नमः ॥",
+    "sloganMarathi": "॥ गणपती बाप्पा मोरया ॥",
+    "addressMarathi": "लक्ष्मी रोड, गणपती चौक, पुणे - ४११००२",
+    "locationMarathi": "पुणे, महाराष्ट्र",
+    "contactNumber": "9822012345",
+    "alternateContact": "9890123456",
+    "whatsappGroupLink": "https://chat.whatsapp.com/GaneshMandal2026",
+    "defaultWhatsAppMessage": "॥ श्री गणेशाय नमः ॥\n\nसस्नेह नमस्कार {donor_name} जी,\n\n{mandal_name} तर्फे सन {year} च्या गणेशोत्सवासाठी आपली ₹{amount}/- ची देणगी / वर्गणी अधिकृतपणे जमा झाली आहे.\n\nपावती क्र: {receipt_no}\nदिनांक: {date}\n\nआपली डिजिटल पावती सोबत जोडली आहे. बाप्पाच्या कृपेने आपल्या सर्व मनोकामना पूर्ण होवोत हीच प्रार्थना!\n\n॥ गणपती बाप्पा मोरया ॥",
+    "receiptPrefix": "",
+    "startingReceiptNumber": 1,
+    "designations": [
+      {
+        "id": "desig-1",
+        "titleMarathi": "अध्यक्ष",
+        "titleEnglish": "President",
+        "name": "श्री. सचिन तांबडे",
+        "enabled": true
+      },
+      {
+        "id": "desig-2",
+        "titleMarathi": "सचिव / कार्यवाह",
+        "titleEnglish": "Secretary",
+        "name": "श्री. आनंद कुलकर्णी",
+        "enabled": true
+      },
+      {
+        "id": "desig-3",
+        "titleMarathi": "खजिनदार",
+        "titleEnglish": "Treasurer",
+        "name": "श्री. विजय मोरे",
+        "enabled": true
+      }
+    ]
+  },
+  "users": [
+    {
+      "id": "admin-1",
+      "email": "admin@mandal.org",
+      "passwordHash": "$2a$10$RyuEfB5e/Qk5VlwI5eYkwOpOh4WAUteeU5YhA7P/NVQKxMHW4VMmi",
+      "name": "सुपर ॲडमिन (Super Admin)",
+      "role": "SUPER_ADMIN",
+      "phone": "9876543210",
+      "active": true,
+      "createdAt": "2026-08-15T00:00:00.000Z"
+    },
+    {
+      "id": "host-1",
+      "email": "host@mandal.org",
+      "passwordHash": "$2a$10$mqpl/JXOCjTIvTEy6BwUeuCsjkHw30f3f2w37/4KwXkL3IcTzNnNO",
+      "name": "मंडळ प्रतिनिधी (Field Host)",
+      "role": "HOST",
+      "phone": "9822000000",
+      "active": true,
+      "createdAt": "2026-08-15T00:00:00.000Z"
+    }
+  ],
+  "announcements": [
+    {
+      "id": "ann-1",
+      "titleMarathi": "श्री गणेश आगमन मिरवणूक व महाआरती",
+      "titleEnglish": "Ganesh Arrival Procession & Maha Aarti",
+      "contentMarathi": "यंदाच्या गणेशोत्सवाचे आगमन भाद्रपद शुद्ध चतुर्थी रोजी सकाळी ९:०० वाजता पारंपरिक वाद्यांच्या गजरात होणार आहे. सायंकाळी ७:३० वाजता महाआरतीचे आयोजन करण्यात आले आहे. सर्व भाविक भक्तांनी उपस्थित राहावे.",
+      "contentEnglish": "The grand procession will begin at 9:00 AM followed by Maha Aarti at 7:30 PM. All devotees are cordially invited.",
+      "date": "15/08/2026",
+      "venue": "मंडळ मुख्य मंडप, लक्ष्मी रोड, पुणे",
+      "priority": "HIGH",
+      "active": true,
+      "createdAt": "2026-08-15T08:00:00.000Z"
+    }
+  ],
+  "auditLogs": [
+    {
+      "id": "audit-seed-1",
+      "timestamp": "2026-08-15T10:00:00.000Z",
+      "userId": "host-1",
+      "userName": "मंडळ प्रतिनिधी",
+      "userRole": "HOST",
+      "action": "CREATE_PAVTI",
+      "details": "पावती क्र. 000001 तयार केली (देणगीदार: श्री. राहुल वसंत कदम, रक्कम: ₹5001, UPI)",
+      "mode": "LIVE"
+    }
+  ]
+}
