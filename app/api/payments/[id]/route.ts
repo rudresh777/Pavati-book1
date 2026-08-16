@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getStorageProvider } from '@/lib/storage';
 import { getSession } from '@/lib/auth/session';
-import { AppMode, PaymentStatus } from '@/types';
+import { AppMode } from '@/types';
 
 export async function GET(
   request: Request,
@@ -45,7 +45,16 @@ export async function PATCH(
 
     const { id } = await params;
     const body = await request.json();
-    const { status, notes, mode = 'LIVE' } = body;
+    const {
+      status,
+      donorName,
+      donorMobile,
+      donorAddress,
+      expectedAmount,
+      notes,
+      date,
+      mode = 'LIVE',
+    } = body;
 
     const storage = getStorageProvider();
     await storage.init();
@@ -55,7 +64,7 @@ export async function PATCH(
       return NextResponse.json({ error: 'Payment not found' }, { status: 404 });
     }
 
-    // Only allow updating notes or cancelling if not already paid
+    // 1. If cancelling
     if (status === 'CANCELLED') {
       if (session.role !== 'SUPER_ADMIN' && payment.status === 'PAID') {
         return NextResponse.json(
@@ -63,27 +72,71 @@ export async function PATCH(
           { status: 403 }
         );
       }
-      payment.status = 'CANCELLED';
+      const cancelled = await storage.cancelPendingPayment(id, mode as AppMode);
+      return NextResponse.json({ success: true, payment: cancelled });
     }
 
-    if (notes) {
+    // 2. If editing pending payment
+    if (payment.status === 'PENDING' || payment.status === 'PARTIALLY_PAID') {
+      const numExpected = expectedAmount !== undefined ? Number(expectedAmount) : undefined;
+      const updated = await storage.updatePendingPayment(
+        id,
+        {
+          donorName,
+          donorMobile,
+          donorAddress,
+          expectedAmount: numExpected,
+          notes,
+          date,
+        },
+        mode as AppMode
+      );
+
+      await storage.addAuditLog({
+        userId: session.userId,
+        userName: session.name,
+        userRole: session.role,
+        action: 'PENDING_PAYMENT_EDITED',
+        entityType: 'PAYMENT',
+        entityId: id,
+        details: `Pending payment for ${updated.donorName} updated to ₹${updated.expectedAmount} by ${session.name}.`,
+        mode: mode as AppMode,
+      });
+
+      return NextResponse.json({ success: true, payment: updated });
+    }
+
+    // 3. If updating paid payment notes
+    if (notes !== undefined) {
       payment.notes = notes;
     }
+    const saved = await storage.savePayment(payment, mode as AppMode);
+    return NextResponse.json({ success: true, payment: saved });
+  } catch (error: any) {
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+}
 
-    const updated = await storage.savePayment(payment, mode as AppMode);
+export async function DELETE(
+  request: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const session = await getSession();
+    if (!session) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
 
-    await storage.addAuditLog({
-      userId: session.userId,
-      userName: session.name,
-      userRole: session.role,
-      action: 'PAYMENT_UPDATED',
-      entityType: 'PAYMENT',
-      entityId: id,
-      details: `Payment ${id} status updated to ${payment.status} by ${session.name}.`,
-      mode: mode as AppMode,
-    });
+    const { id } = await params;
+    const { searchParams } = new URL(request.url);
+    const mode = (searchParams.get('mode') as AppMode) || 'LIVE';
 
-    return NextResponse.json({ success: true, payment: updated });
+    const storage = getStorageProvider();
+    await storage.init();
+
+    // Soft delete (Status = CANCELLED) to preserve financial history
+    const cancelled = await storage.cancelPendingPayment(id, mode);
+    return NextResponse.json({ success: true, payment: cancelled });
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }

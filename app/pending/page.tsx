@@ -11,7 +11,11 @@ import {
   Calendar,
   User,
   CreditCard,
-  Sparkles,
+  Edit2,
+  Trash2,
+  AlertTriangle,
+  Eye,
+  Share2,
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { Card, CardContent } from '@/components/ui/Card';
@@ -19,37 +23,55 @@ import { Button } from '@/components/ui/Button';
 import { Modal } from '@/components/ui/Modal';
 import { Badge } from '@/components/ui/Badge';
 import { useAppMode } from '@/lib/context/mode-context';
+import { useLanguage } from '@/lib/context/language-context';
 import { Payment, Pavti, MandalSettings } from '@/types';
 import { formatIndianCurrency } from '@/lib/utils/number-to-words';
 import { PavtiCard } from '@/components/pavti/PavtiCard';
 import { PavtiShareModal } from '@/components/pavti/PavtiShareModal';
 
-export default function PendingPaymentsPage() {
+export default function DueMembersPage() {
   const { mode } = useAppMode();
+  const { language } = useLanguage();
 
   const [pendingList, setPendingList] = useState<Payment[]>([]);
   const [settings, setSettings] = useState<MandalSettings | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
+  const [dateFilter, setDateFilter] = useState('');
   const [isLoading, setIsLoading] = useState(true);
 
-  // Mark as Paid Modal State
-  const [selectedPayment, setSelectedPayment] = useState<Payment | null>(null);
+  // 1. Mark as Paid Modal State
+  const [markPaidPayment, setMarkPaidPayment] = useState<Payment | null>(null);
   const [receivedAmount, setReceivedAmount] = useState<string>('');
-  const [paymentMethod, setPaymentMethod] = useState<'CASH' | 'UPI' | 'OTHER'>('CASH');
+  const [paymentMethod, setPaymentMethod] = useState<'CASH' | 'UPI'>('CASH');
+  const [paymentDate, setPaymentDate] = useState<string>('');
   const [transactionReference, setTransactionReference] = useState('');
-  const [notes, setNotes] = useState('');
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [modalError, setModalError] = useState('');
+  const [paidNotes, setPaidNotes] = useState('');
+  const [isSubmittingPaid, setIsSubmittingPaid] = useState(false);
+  const [paidModalError, setPaidModalError] = useState('');
 
-  // Generated Pavti for sharing
-  const [generatedPavti, setGeneratedPavti] = useState<Pavti | null>(null);
+  // 2. Edit Modal State
+  const [editPayment, setEditPayment] = useState<Payment | null>(null);
+  const [editDonorName, setEditDonorName] = useState('');
+  const [editDonorMobile, setEditDonorMobile] = useState('');
+  const [editDonorAddress, setEditDonorAddress] = useState('');
+  const [editExpectedAmount, setEditExpectedAmount] = useState('');
+  const [editNotes, setEditNotes] = useState('');
+  const [isSubmittingEdit, setIsSubmittingEdit] = useState(false);
+  const [editModalError, setEditModalError] = useState('');
+
+  // 3. Cancel Confirmation Modal State
+  const [cancelPayment, setCancelPayment] = useState<Payment | null>(null);
+  const [isSubmittingCancel, setIsSubmittingCancel] = useState(false);
+
+  // 4. Generated / Preview Pavti for sharing
+  const [selectedPavti, setSelectedPavti] = useState<Pavti | null>(null);
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
 
-  const fetchPendingData = async () => {
+  const fetchDueData = async () => {
     setIsLoading(true);
     try {
       const [payRes, setRes] = await Promise.all([
-        fetch(`/api/payments?status=PENDING&mode=${mode}`),
+        fetch(`/api/payments?status=DUE&mode=${mode}`),
         fetch(`/api/settings`),
       ]);
 
@@ -59,262 +81,449 @@ export default function PendingPaymentsPage() {
       if (payData.payments) setPendingList(payData.payments);
       if (setData.settings) setSettings(setData.settings);
     } catch (err) {
-      console.error('Failed to fetch pending payments:', err);
+      console.error('Failed to fetch due payments:', err);
     } finally {
       setIsLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchPendingData();
+    fetchDueData();
   }, [mode]);
 
-  const handleOpenMarkPaidModal = (payment: Payment) => {
-    setSelectedPayment(payment);
-    setReceivedAmount((payment.expectedAmount - payment.receivedAmount).toString());
+  // Handle Mark as Paid Modal Open
+  const handleOpenMarkPaid = (payment: Payment) => {
+    setMarkPaidPayment(payment);
+    const remaining = payment.expectedAmount - (payment.receivedAmount || 0);
+    setReceivedAmount(remaining.toString());
     setPaymentMethod('CASH');
+    setPaymentDate(new Date().toISOString().split('T')[0]);
     setTransactionReference('');
-    setNotes('');
-    setModalError('');
+    setPaidNotes('');
+    setPaidModalError('');
   };
 
+  // Submit Mark as Paid
   const handleConfirmPaid = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedPayment) return;
+    if (!markPaidPayment || isSubmittingPaid) return;
 
     const numAmt = Number(receivedAmount);
     if (!numAmt || numAmt <= 0) {
-      setModalError('कृपया वैध प्राप्त रक्कम प्रविष्ट करा.');
+      setPaidModalError(language === 'mr' ? 'कृपया वैध रक्कम प्रविष्ट करा.' : 'Please enter a valid amount.');
       return;
     }
 
-    setIsSubmitting(true);
-    setModalError('');
+    setIsSubmittingPaid(true);
+    setPaidModalError('');
 
     try {
-      const res = await fetch(`/api/payments/${selectedPayment.id}/mark-paid`, {
+      const res = await fetch(`/api/payments/${markPaidPayment.id}/mark-paid`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           receivedAmount: numAmt,
           paymentMethod,
+          paymentDate,
           transactionReference: transactionReference.trim(),
-          notes: notes.trim(),
+          notes: paidNotes.trim(),
           mode,
         }),
       });
 
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'पेमेंट नोंद करण्यात अडचण आली.');
+      if (!res.ok) throw new Error(data.error || 'पेमेंट नोंदवण्यात त्रुटी आली.');
 
-      // Trigger celebratory confetti
+      // Trigger Confetti
       confetti({
-        particleCount: 80,
-        spread: 70,
+        particleCount: 90,
+        spread: 75,
         origin: { y: 0.6 },
         colors: ['#ea580c', '#f59e0b', '#10b981'],
       });
 
-      setSelectedPayment(null);
-      setGeneratedPavti(data.pavti);
+      setMarkPaidPayment(null);
+      setSelectedPavti(data.pavti);
       setIsShareModalOpen(true);
-      fetchPendingData();
+      fetchDueData();
     } catch (err: any) {
-      setModalError(err.message || 'काहीतरी त्रुटी आली.');
+      setPaidModalError(err.message || 'त्रुटी आली.');
     } finally {
-      setIsSubmitting(false);
+      setIsSubmittingPaid(false);
     }
   };
 
-  const filteredPending = pendingList.filter((p) => {
+  // Handle Edit Modal Open
+  const handleOpenEdit = (payment: Payment) => {
+    setEditPayment(payment);
+    setEditDonorName(payment.donorName);
+    setEditDonorMobile(payment.donorMobile || '');
+    setEditDonorAddress(payment.donorAddress || '');
+    setEditExpectedAmount(payment.expectedAmount.toString());
+    setEditNotes(payment.notes || '');
+    setEditModalError('');
+  };
+
+  // Submit Edit Due Record
+  const handleConfirmEdit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editPayment || isSubmittingEdit) return;
+
+    const numAmt = Number(editExpectedAmount);
+    if (!numAmt || numAmt <= 0) {
+      setEditModalError(language === 'mr' ? 'कृपया वैध अपेक्षित रक्कम प्रविष्ट करा.' : 'Please enter a valid expected amount.');
+      return;
+    }
+
+    setIsSubmittingEdit(true);
+    setEditModalError('');
+
+    try {
+      const res = await fetch(`/api/payments/${editPayment.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          donorName: editDonorName.trim(),
+          donorMobile: editDonorMobile.trim(),
+          donorAddress: editDonorAddress.trim(),
+          expectedAmount: numAmt,
+          notes: editNotes.trim(),
+          mode,
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'बदल सेव्ह करण्यात त्रुटी आली.');
+
+      setEditPayment(null);
+      fetchDueData();
+    } catch (err: any) {
+      setEditModalError(err.message || 'त्रुटी आली.');
+    } finally {
+      setIsSubmittingEdit(false);
+    }
+  };
+
+  // Submit Cancel Due Record
+  const handleConfirmCancel = async () => {
+    if (!cancelPayment || isSubmittingCancel) return;
+
+    setIsSubmittingCancel(true);
+    try {
+      const res = await fetch(`/api/payments/${cancelPayment.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          status: 'CANCELLED',
+          mode,
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'रद्द करण्यात त्रुटी आली.');
+
+      setCancelPayment(null);
+      fetchDueData();
+    } catch (err: any) {
+      alert(err.message || 'त्रुटी आली.');
+    } finally {
+      setIsSubmittingCancel(false);
+    }
+  };
+
+  // Preview Due Pavti
+  const handlePreviewDuePavti = async (paymentId: string) => {
+    try {
+      const res = await fetch(`/api/pavtis?mode=${mode}`);
+      const data = await res.json();
+      const pavti = (data.pavtis || []).find((p: Pavti) => p.paymentId === paymentId);
+      if (pavti) {
+        setSelectedPavti(pavti);
+        setIsShareModalOpen(true);
+      } else {
+        alert('पावती उपलब्ध नाही.');
+      }
+    } catch {
+      alert('पावती लोड करताना त्रुटी आली.');
+    }
+  };
+
+  // Filter Active Due Items
+  const activeDueList = pendingList.filter(
+    (p) => p.status === 'DUE' || p.status === 'PENDING' || p.status === 'PARTIALLY_PAID'
+  );
+
+  const filteredDue = activeDueList.filter((p) => {
     const q = searchQuery.toLowerCase().trim();
-    if (!q) return true;
-    return (
+    const matchesSearch =
+      !q ||
       p.donorName.toLowerCase().includes(q) ||
       p.donorMobile?.includes(q) ||
-      (p.donorAddress && p.donorAddress.toLowerCase().includes(q))
-    );
+      (p.donorAddress && p.donorAddress.toLowerCase().includes(q));
+
+    const matchesDate = !dateFilter || p.date === dateFilter;
+
+    return matchesSearch && matchesDate;
   });
 
-  const totalPendingAmount = pendingList.reduce(
-    (sum, p) => sum + (p.expectedAmount - p.receivedAmount),
+  // Dynamic Calculations from Active Due Records
+  const totalDueCount = activeDueList.length;
+  const totalDueAmount = activeDueList.reduce(
+    (sum, p) => sum + (p.expectedAmount - (p.receivedAmount || 0)),
     0
   );
 
   return (
     <div className="space-y-6 pb-12">
-      {/* Page Title & Stats */}
+      {/* HEADER & TOTAL DUE SUMMARY STRIP */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-stone-200 pb-4">
         <div>
           <h1 className="text-xl sm:text-2xl font-black font-devanagari text-stone-900 flex items-center gap-2">
             <Clock className="w-6 h-6 text-amber-600" />
-            <span>येणे बाकी देणगी यादी (Pending Collections)</span>
+            <span>{language === 'mr' ? 'बाकी यादी (Due Members)' : 'Due Members List'}</span>
           </h1>
           <p className="text-xs text-stone-500 font-devanagari">
-            ज्या देणगीदारांची वर्गणी येणे बाकी आहे त्यांची यादी. पैसे आल्यावर "जमा करा" वर क्लिक करा.
+            {language === 'mr'
+              ? 'ज्या देणगीदारांची वर्गणी येणे बाकी आहे त्यांची यादी. पैसे प्राप्त झाल्यावर "पैसे मिळाले" वर क्लिक करा.'
+              : 'List of members with outstanding contributions. Click "Mark as Paid" once payment is received.'}
           </p>
         </div>
 
-        <div className="flex items-center gap-3">
-          <div className="bg-amber-100/80 px-4 py-2 rounded-xl border border-amber-300 text-right">
-            <div className="text-[10px] font-bold text-amber-900 uppercase font-devanagari">
-              एकूण येणे बाकी रक्कम:
+        <div className="flex flex-wrap items-center gap-3">
+          {/* TOTAL DUE MEMBERS & AMOUNT SUMMARY WIDGET */}
+          <div className="bg-amber-100/90 px-4 py-2 rounded-xl border-2 border-amber-300 shadow-sm text-right flex items-center gap-4">
+            <div>
+              <div className="text-[10px] font-bold text-amber-800 uppercase font-devanagari">
+                {language === 'mr' ? 'एकूण बाकीदार' : 'Due Members'}
+              </div>
+              <div className="text-lg font-black text-amber-950 font-mono">
+                {totalDueCount}
+              </div>
             </div>
-            <div className="text-lg font-black text-amber-950 font-mono">
-              {formatIndianCurrency(totalPendingAmount)}
+            <div className="border-l border-amber-300 pl-4">
+              <div className="text-[10px] font-bold text-amber-800 uppercase font-devanagari">
+                {language === 'mr' ? 'एकूण बाकी रक्कम' : 'Total Due Amount'}
+              </div>
+              <div className="text-lg sm:text-xl font-black text-amber-950 font-mono tracking-tight text-orange-900">
+                {formatIndianCurrency(totalDueAmount)}
+              </div>
             </div>
           </div>
 
-          <Link href="/pavti/new?pending=true">
-            <Button variant="primary" size="sm" className="font-devanagari py-2 px-3 flex items-center gap-1.5">
+          <Link href="/pavti/new">
+            <Button variant="primary" size="sm" className="font-devanagari py-2.5 px-3.5 flex items-center gap-1.5 shadow">
               <PlusCircle className="w-4 h-4" />
-              <span>+ बाकी नोंद</span>
+              <span>{language === 'mr' ? '+ नवीन पावती / बाकी नोंद' : '+ New Pavti / Due'}</span>
             </Button>
           </Link>
         </div>
       </div>
 
-      {/* Search Bar */}
-      <div className="relative max-w-md">
-        <Search className="w-4 h-4 text-stone-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
-        <input
-          type="text"
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          placeholder="देणगीदाराचे नाव किंवा मोबाईल नंबर शोधा..."
-          className="w-full pl-10 pr-4 py-2.5 bg-white border border-stone-300 rounded-xl text-xs sm:text-sm text-stone-900 focus:outline-none focus:ring-2 focus:ring-orange-500 font-devanagari"
-        />
+      {/* SEARCH AND FILTER CONTROLS */}
+      <div className="flex flex-wrap items-center gap-3 bg-white p-3.5 rounded-xl border border-stone-200 shadow-sm">
+        <div className="relative flex-1 min-w-[240px]">
+          <Search className="w-4 h-4 text-stone-400 absolute left-3 top-1/2 -translate-y-1/2" />
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder={language === 'mr' ? 'देणगीदाराचे नाव किंवा मोबाईल नंबर शोधा...' : 'Search by name or mobile number...'}
+            className="w-full pl-9 pr-4 py-2 bg-stone-50 border border-stone-300 rounded-lg text-xs sm:text-sm text-stone-900 focus:outline-none focus:ring-2 focus:ring-orange-500 font-devanagari"
+          />
+        </div>
+
+        <div className="flex items-center gap-2">
+          <input
+            type="date"
+            value={dateFilter}
+            onChange={(e) => setDateFilter(e.target.value)}
+            className="px-3 py-2 bg-stone-50 border border-stone-300 rounded-lg text-xs font-mono text-stone-800 focus:outline-none focus:ring-2 focus:ring-orange-500"
+          />
+          {dateFilter && (
+            <button
+              onClick={() => setDateFilter('')}
+              className="text-xs text-stone-500 hover:text-red-600 underline font-devanagari"
+            >
+              तारीख साफ करा
+            </button>
+          )}
+        </div>
       </div>
 
-      {/* Pending Table / Cards */}
-      {filteredPending.length === 0 ? (
-        <Card className="border-dashed border-stone-300">
-          <CardContent className="p-12 text-center space-y-2">
-            <CheckCircle2 className="w-12 h-12 text-emerald-500 mx-auto" />
-            <h3 className="text-base font-bold text-stone-800 font-devanagari">
-              {searchQuery ? 'शोध परिणामात कोणतीही नोंद आढळली नाही' : 'सध्या कोणतीही बाकी रक्कम प्रलंबित नाही'}
-            </h3>
-            <p className="text-xs text-stone-500 font-devanagari">
-              सर्व देणगीदारांच्या पावत्या अधिकृतपणे जमा झालेल्या आहेत.
-            </p>
-          </CardContent>
-        </Card>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {filteredPending.map((p) => (
-            <Card key={p.id} className="border-amber-200/90 hover:border-amber-400 transition-all shadow-sm">
-              <CardContent className="p-5 space-y-3">
-                <div className="flex items-start justify-between gap-2 border-b border-stone-100 pb-2.5">
-                  <div className="space-y-0.5">
-                    <h3 className="font-bold text-base text-stone-900 font-devanagari">
-                      {p.donorName}
-                    </h3>
-                    {p.donorMobile && (
-                      <div className="text-xs text-stone-500 font-mono flex items-center gap-1">
-                        <Phone className="w-3 h-3 text-stone-400" />
-                        <span>{p.donorMobile}</span>
-                      </div>
-                    )}
-                  </div>
-                  <Badge variant="warning">बाकी (Pending)</Badge>
-                </div>
-
-                <div className="space-y-1.5 text-xs text-stone-600">
-                  <div className="flex items-center justify-between">
-                    <span className="font-devanagari">अपेक्षित देणगी:</span>
-                    <span className="font-bold text-stone-900 font-mono text-sm">
-                      {formatIndianCurrency(p.expectedAmount)}
-                    </span>
-                  </div>
-
-                  {p.receivedAmount > 0 && (
-                    <div className="flex items-center justify-between text-emerald-700">
-                      <span className="font-devanagari">आतापर्यंत जमा:</span>
-                      <span className="font-bold font-mono">
-                        {formatIndianCurrency(p.receivedAmount)}
-                      </span>
+      {/* SIMPLE TABLE FORMAT (EASY SCANNING & RESPONSIVE HORIZONTAL SCROLL) */}
+      <div className="bg-white rounded-2xl border border-amber-200 overflow-hidden shadow-sm">
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-xs text-stone-700 min-w-[700px]">
+            <thead className="bg-amber-50 text-amber-950 font-bold border-b border-amber-200 uppercase font-devanagari">
+              <tr>
+                <th className="px-4 py-3.5">देणगीदार (Donor)</th>
+                <th className="px-4 py-3.5">मोबाईल (Mobile)</th>
+                <th className="px-4 py-3.5">पत्ता (Address)</th>
+                <th className="px-4 py-3.5">बाकी रक्कम (Due Amount)</th>
+                <th className="px-4 py-3.5">दिनांक (Date)</th>
+                <th className="px-4 py-3.5">स्थिती (Status)</th>
+                <th className="px-4 py-3.5 text-right">कृती (Action)</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-stone-100">
+              {filteredDue.length === 0 ? (
+                <tr>
+                  <td colSpan={7} className="text-center py-12 text-stone-400 font-devanagari space-y-2">
+                    <CheckCircle2 className="w-10 h-10 text-emerald-500 mx-auto opacity-70" />
+                    <div className="font-bold text-stone-700 text-sm">
+                      {searchQuery || dateFilter
+                        ? 'दिलेल्या निकषानुसार कोणतीही बाकी नोंद आढळली नाही.'
+                        : 'सध्या कोणतीही बाकी रक्कम प्रलंबित नाही.'}
                     </div>
-                  )}
+                  </td>
+                </tr>
+              ) : (
+                filteredDue.map((p) => {
+                  const balance = p.expectedAmount - (p.receivedAmount || 0);
+                  return (
+                    <tr key={p.id} className="hover:bg-amber-50/50 transition-colors">
+                      {/* 1. Donor Name */}
+                      <td className="px-4 py-3.5">
+                        <div className="font-bold text-stone-900 text-sm font-devanagari">
+                          {p.donorName}
+                        </div>
+                        {p.notes && (
+                          <div className="text-[11px] text-stone-500 italic truncate max-w-xs font-devanagari">
+                            टीप: {p.notes}
+                          </div>
+                        )}
+                      </td>
 
-                  <div className="flex items-center justify-between pt-1 border-t border-stone-100 font-bold text-amber-900">
-                    <span className="font-devanagari">शिल्लक येणे बाकी:</span>
-                    <span className="font-mono text-base">
-                      {formatIndianCurrency(p.expectedAmount - p.receivedAmount)}
-                    </span>
-                  </div>
-                </div>
+                      {/* 2. Mobile */}
+                      <td className="px-4 py-3.5 font-mono text-stone-700">
+                        {p.donorMobile ? (
+                          <span className="flex items-center gap-1">
+                            <Phone className="w-3 h-3 text-stone-400" />
+                            <span>{p.donorMobile}</span>
+                          </span>
+                        ) : (
+                          '-'
+                        )}
+                      </td>
 
-                {p.donorAddress && (
-                  <div className="text-[11px] text-stone-500 truncate font-devanagari">
-                    📍 {p.donorAddress}
-                  </div>
-                )}
+                      {/* 3. Address */}
+                      <td className="px-4 py-3.5 text-stone-600 max-w-[200px] truncate font-devanagari">
+                        {p.donorAddress || '-'}
+                      </td>
 
-                {p.notes && (
-                  <div className="text-[11px] text-stone-500 italic bg-stone-50 p-2 rounded border border-stone-100">
-                    टीप: {p.notes}
-                  </div>
-                )}
+                      {/* 4. Due Amount */}
+                      <td className="px-4 py-3.5 font-mono font-bold text-base text-orange-800">
+                        {formatIndianCurrency(balance)}
+                      </td>
 
-                <div className="pt-2">
-                  <Button
-                    variant="gold"
-                    size="sm"
-                    onClick={() => handleOpenMarkPaidModal(p)}
-                    className="w-full font-devanagari py-2 font-bold flex items-center justify-center gap-1.5 shadow"
-                  >
-                    <CheckCircle2 className="w-4 h-4" />
-                    <span>पैसे मिळाले (Mark as Paid)</span>
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
+                      {/* 5. Date */}
+                      <td className="px-4 py-3.5 font-mono text-stone-500">
+                        {p.date}
+                      </td>
+
+                      {/* 6. Status */}
+                      <td className="px-4 py-3.5">
+                        <span className="px-2.5 py-1 bg-amber-100 text-amber-900 border border-amber-300 rounded-md font-bold text-[11px] font-devanagari inline-block shadow-sm">
+                          बाकी / DUE
+                        </span>
+                      </td>
+
+                      {/* 7. Action */}
+                      <td className="px-4 py-3.5 text-right">
+                        <div className="flex items-center justify-end gap-2">
+                          {/* Mark as Paid Action Button */}
+                          <button
+                            type="button"
+                            onClick={() => handleOpenMarkPaid(p)}
+                            className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-bold text-xs font-devanagari shadow-sm transition-all flex items-center gap-1.5"
+                          >
+                            <CheckCircle2 className="w-3.5 h-3.5" />
+                            <span>{language === 'mr' ? 'पैसे मिळाले' : 'Mark as Paid'}</span>
+                          </button>
+
+                          {/* Preview Due Pavti */}
+                          <button
+                            type="button"
+                            onClick={() => handlePreviewDuePavti(p.id)}
+                            title="बाकी पावती पहा / शेअर करा"
+                            className="p-1.5 text-amber-700 hover:text-orange-900 hover:bg-amber-100 rounded-lg transition-colors"
+                          >
+                            <Eye className="w-4 h-4" />
+                          </button>
+
+                          {/* Edit Due Record */}
+                          <button
+                            type="button"
+                            onClick={() => handleOpenEdit(p)}
+                            title="संपादित करा"
+                            className="p-1.5 text-stone-600 hover:text-orange-600 hover:bg-stone-100 rounded-lg transition-colors"
+                          >
+                            <Edit2 className="w-4 h-4" />
+                          </button>
+
+                          {/* Cancel Due Record */}
+                          <button
+                            type="button"
+                            onClick={() => setCancelPayment(p)}
+                            title="रद्द करा"
+                            className="p-1.5 text-stone-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
         </div>
-      )}
+      </div>
 
-      {/* MARK AS PAID MODAL */}
-      {selectedPayment && (
+      {/* 1. CONFIRM PAYMENT MODAL (MARK AS PAID CONFIRMATION) */}
+      {markPaidPayment && (
         <Modal
-          isOpen={!!selectedPayment}
-          onClose={() => setSelectedPayment(null)}
+          isOpen={!!markPaidPayment}
+          onClose={() => setMarkPaidPayment(null)}
           title={
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 text-emerald-700">
               <CheckCircle2 className="w-5 h-5 text-emerald-600" />
-              <span className="font-devanagari">रक्कम जमा करा व पावती फाडा</span>
+              <span className="font-devanagari">
+                {language === 'mr' ? 'पेमेंट पुष्टीकरण (Confirm Payment)' : 'Confirm Payment'}
+              </span>
             </div>
           }
-          description={`देणगीदार: ${selectedPayment.donorName}`}
+          description={`${markPaidPayment.donorName} यांच्याकडून देणगी रक्कम प्रत्यक्षात प्राप्त झाली आहे का?`}
           maxWidth="md"
         >
-          <form onSubmit={handleConfirmPaid} className="space-y-4">
-            {modalError && (
-              <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-xs text-red-700 font-bold">
-                {modalError}
+          <form onSubmit={handleConfirmPaid} className="space-y-4 pt-1">
+            {paidModalError && (
+              <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-xs text-red-700 font-bold font-devanagari">
+                {paidModalError}
               </div>
             )}
 
-            <div className="p-3 bg-amber-50 rounded-xl border border-amber-200 text-xs text-stone-700 space-y-1">
+            {/* Donor & Amount Box */}
+            <div className="p-3.5 bg-amber-50 rounded-xl border border-amber-200 text-xs text-stone-800 space-y-1.5 font-devanagari">
               <div className="flex justify-between">
-                <span>अपेक्षित देणगी रक्कम:</span>
-                <span className="font-bold font-mono">
-                  {formatIndianCurrency(selectedPayment.expectedAmount)}
-                </span>
+                <span>देणगीदार (Donor):</span>
+                <strong className="text-stone-900">{markPaidPayment.donorName}</strong>
               </div>
-              <div className="flex justify-between font-bold text-amber-900">
-                <span>शिल्लक बाकी:</span>
-                <span className="font-mono">
+              <div className="flex justify-between font-bold text-amber-900 text-sm">
+                <span>बाकी रक्कम (Due Amount):</span>
+                <span className="font-mono text-orange-900 text-base">
                   {formatIndianCurrency(
-                    selectedPayment.expectedAmount - selectedPayment.receivedAmount
+                    markPaidPayment.expectedAmount - (markPaidPayment.receivedAmount || 0)
                   )}
                 </span>
               </div>
             </div>
 
-            {/* Received Amount */}
+            {/* Received Amount Input */}
             <div className="space-y-1">
               <label className="block text-xs font-bold text-stone-700 font-devanagari">
-                प्रत्यक्ष प्राप्त रक्कम (Received Amount ₹) *
+                {language === 'mr' ? 'प्रत्यक्षात प्राप्त रक्कम (Received Amount) *' : 'Actual Received Amount *'}
               </label>
               <div className="relative">
                 <span className="absolute left-3.5 top-1/2 -translate-y-1/2 font-bold text-stone-500">
@@ -326,66 +535,81 @@ export default function PendingPaymentsPage() {
                   required
                   value={receivedAmount}
                   onChange={(e) => setReceivedAmount(e.target.value)}
-                  className="w-full pl-8 pr-3.5 py-2.5 bg-white border-2 border-orange-400 rounded-xl font-mono font-bold text-lg text-stone-900 focus:outline-none focus:ring-2 focus:ring-orange-500"
+                  className="w-full pl-8 pr-3.5 py-2.5 bg-white border-2 border-emerald-500 rounded-xl font-mono font-bold text-lg text-stone-900 focus:outline-none focus:ring-2 focus:ring-emerald-500"
                 />
               </div>
             </div>
 
-            {/* Payment Method */}
+            {/* Payment Method (Cash or UPI only) */}
             <div className="space-y-2">
               <label className="block text-xs font-bold text-stone-700 font-devanagari">
-                पैसे भरण्याचा प्रकार (Payment Mode)
+                {language === 'mr' ? 'पेमेंट पद्धत निवडा :' : 'Payment Method :'}
               </label>
               <div className="grid grid-cols-2 gap-2">
                 <button
                   type="button"
                   onClick={() => setPaymentMethod('CASH')}
-                  className={`py-2 px-3 rounded-lg border text-xs font-bold font-devanagari ${
+                  className={`py-2.5 px-3 rounded-xl border text-xs font-bold font-devanagari flex items-center justify-center gap-1.5 transition-all ${
                     paymentMethod === 'CASH'
-                      ? 'bg-amber-100 border-orange-600 text-orange-950 font-bold'
+                      ? 'bg-amber-100 border-orange-600 text-orange-950 shadow-sm'
                       : 'bg-stone-50 border-stone-200 text-stone-700'
                   }`}
                 >
-                  💵 रोख (Cash)
+                  💵 {language === 'mr' ? 'रोख (Cash)' : 'Cash'}
                 </button>
                 <button
                   type="button"
                   onClick={() => setPaymentMethod('UPI')}
-                  className={`py-2 px-3 rounded-lg border text-xs font-bold font-devanagari ${
+                  className={`py-2.5 px-3 rounded-xl border text-xs font-bold font-devanagari flex items-center justify-center gap-1.5 transition-all ${
                     paymentMethod === 'UPI'
-                      ? 'bg-blue-50 border-blue-600 text-blue-950 font-bold'
+                      ? 'bg-blue-50 border-blue-600 text-blue-950 shadow-sm'
                       : 'bg-stone-50 border-stone-200 text-stone-700'
                   }`}
                 >
-                  📱 UPI / Online
+                  📱 {language === 'mr' ? 'UPI (ऑनलाइन)' : 'UPI'}
                 </button>
               </div>
 
               {paymentMethod === 'UPI' && (
-                <div className="space-y-1 pt-1">
-                  <label className="block text-[11px] font-bold text-blue-900">
-                    UPI Ref / UTR No. (ऐच्छिक)
+                <div className="space-y-1 pt-1 animate-in fade-in">
+                  <label className="block text-[11px] font-bold text-blue-900 font-devanagari">
+                    UPI Transaction ID / Ref Number (ऐच्छिक)
                   </label>
                   <input
                     type="text"
                     value={transactionReference}
                     onChange={(e) => setTransactionReference(e.target.value)}
                     placeholder="उदा. 423589123456"
-                    className="w-full px-3 py-1.5 border border-blue-300 rounded-lg text-xs font-mono"
+                    className="w-full px-3 py-2 border border-blue-300 rounded-lg text-xs font-mono"
                   />
                 </div>
               )}
             </div>
 
+            {/* Payment Date */}
             <div className="space-y-1">
               <label className="block text-xs font-bold text-stone-700 font-devanagari">
-                टीप (Notes - Optional)
+                {language === 'mr' ? 'पेमेंट दिनांक (Date)' : 'Payment Date'}
+              </label>
+              <input
+                type="date"
+                required
+                value={paymentDate}
+                onChange={(e) => setPaymentDate(e.target.value)}
+                className="w-full px-3 py-2 border border-stone-300 rounded-lg text-xs font-mono"
+              />
+            </div>
+
+            {/* Notes */}
+            <div className="space-y-1">
+              <label className="block text-xs font-bold text-stone-700 font-devanagari">
+                {language === 'mr' ? 'टीप / शेरा (Optional Notes)' : 'Notes'}
               </label>
               <input
                 type="text"
-                value={notes}
-                onChange={(e) => setNotes(e.target.value)}
-                placeholder="उदा. रोख रक्कम स्वीकारली"
+                value={paidNotes}
+                onChange={(e) => setPaidNotes(e.target.value)}
+                placeholder="उदा. वर्गणी प्राप्त झाली"
                 className="w-full px-3 py-2 border border-stone-300 rounded-lg text-xs font-devanagari"
               />
             </div>
@@ -395,40 +619,201 @@ export default function PendingPaymentsPage() {
                 type="button"
                 variant="outline"
                 size="sm"
-                onClick={() => setSelectedPayment(null)}
+                onClick={() => setMarkPaidPayment(null)}
               >
-                रद्द करा
+                रद्द करा (Cancel)
               </Button>
               <Button
                 type="submit"
-                variant="gold"
+                variant="primary"
                 size="sm"
-                isLoading={isSubmitting}
-                className="font-devanagari font-bold px-4"
+                isLoading={isSubmittingPaid}
+                className="font-devanagari font-bold px-5 bg-emerald-600 hover:bg-emerald-700 text-white"
               >
-                पावती तयार करा व सेव्ह करा
+                होय, पैसे जमा झाले (Confirm Paid)
               </Button>
             </div>
           </form>
         </Modal>
       )}
 
-      {/* SHARE MODAL AFTER MARKING PAID */}
-      {generatedPavti && settings && (
+      {/* 2. EDIT DUE RECORD MODAL */}
+      {editPayment && (
+        <Modal
+          isOpen={!!editPayment}
+          onClose={() => setEditPayment(null)}
+          title={
+            <div className="flex items-center gap-2">
+              <Edit2 className="w-5 h-5 text-orange-600" />
+              <span className="font-devanagari">बाकी नोंद संपादित करा</span>
+            </div>
+          }
+          description="देणगीदाराचे नाव, मोबाईल किंवा अपेक्षित रक्कम अद्ययावत करा."
+          maxWidth="md"
+        >
+          <form onSubmit={handleConfirmEdit} className="space-y-4">
+            {editModalError && (
+              <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-xs text-red-700 font-bold font-devanagari">
+                {editModalError}
+              </div>
+            )}
+
+            {/* Donor Name */}
+            <div className="space-y-1">
+              <label className="block text-xs font-bold text-stone-700 font-devanagari">
+                देणगीदाराचे पूर्ण नाव *
+              </label>
+              <input
+                type="text"
+                required
+                value={editDonorName}
+                onChange={(e) => setEditDonorName(e.target.value)}
+                className="w-full px-3.5 py-2 border border-stone-300 rounded-lg text-xs text-stone-900 font-devanagari font-bold"
+              />
+            </div>
+
+            {/* Mobile & Expected Amount */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <label className="block text-xs font-bold text-stone-700 font-devanagari">
+                  मोबाईल नंबर
+                </label>
+                <input
+                  type="tel"
+                  maxLength={10}
+                  value={editDonorMobile}
+                  onChange={(e) => setEditDonorMobile(e.target.value.replace(/\D/g, ''))}
+                  className="w-full px-3.5 py-2 border border-stone-300 rounded-lg text-xs font-mono"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="block text-xs font-bold text-stone-700 font-devanagari">
+                  बाकी रक्कम (Due Amount) *
+                </label>
+                <input
+                  type="number"
+                  min="1"
+                  required
+                  value={editExpectedAmount}
+                  onChange={(e) => setEditExpectedAmount(e.target.value)}
+                  className="w-full px-3.5 py-2 border-2 border-amber-400 rounded-lg text-xs font-mono font-bold text-stone-900"
+                />
+              </div>
+            </div>
+
+            {/* Address */}
+            <div className="space-y-1">
+              <label className="block text-xs font-bold text-stone-700 font-devanagari">
+                पत्ता (Address)
+              </label>
+              <input
+                type="text"
+                value={editDonorAddress}
+                onChange={(e) => setEditDonorAddress(e.target.value)}
+                className="w-full px-3.5 py-2 border border-stone-300 rounded-lg text-xs font-devanagari"
+              />
+            </div>
+
+            {/* Notes */}
+            <div className="space-y-1">
+              <label className="block text-xs font-bold text-stone-700 font-devanagari">
+                टीप / शेरा
+              </label>
+              <input
+                type="text"
+                value={editNotes}
+                onChange={(e) => setEditNotes(e.target.value)}
+                className="w-full px-3.5 py-2 border border-stone-300 rounded-lg text-xs font-devanagari"
+              />
+            </div>
+
+            <div className="pt-3 flex items-center justify-end gap-2 border-t border-stone-100">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setEditPayment(null)}
+              >
+                रद्द करा
+              </Button>
+              <Button
+                type="submit"
+                variant="primary"
+                size="sm"
+                isLoading={isSubmittingEdit}
+                className="font-devanagari font-bold px-4"
+              >
+                बदल सेव्ह करा
+              </Button>
+            </div>
+          </form>
+        </Modal>
+      )}
+
+      {/* 3. CANCEL DUE RECORD MODAL */}
+      {cancelPayment && (
+        <Modal
+          isOpen={!!cancelPayment}
+          onClose={() => setCancelPayment(null)}
+          title={
+            <div className="flex items-center gap-2 text-red-600 font-devanagari">
+              <AlertTriangle className="w-5 h-5" />
+              <span>बाकी नोंद रद्द करा</span>
+            </div>
+          }
+          description="तुम्हाला ही बाकी नोंद रद्द करायची आहे का? ही नोंद सक्रिय यादीतून हटवली जाईल."
+          maxWidth="sm"
+        >
+          <div className="space-y-4 pt-2">
+            <div className="p-3.5 bg-red-50 rounded-xl border border-red-200 text-xs text-red-900 space-y-1 font-devanagari">
+              <div><strong>देणगीदार:</strong> {cancelPayment.donorName}</div>
+              <div><strong>बाकी रक्कम:</strong> ₹{cancelPayment.expectedAmount}</div>
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setCancelPayment(null)}
+              >
+                रद्द करा (Cancel)
+              </Button>
+              <Button
+                type="button"
+                variant="danger"
+                size="sm"
+                isLoading={isSubmittingCancel}
+                onClick={handleConfirmCancel}
+                className="font-devanagari font-bold"
+              >
+                होय, नोंद रद्द करा
+              </Button>
+            </div>
+          </div>
+        </Modal>
+      )}
+
+      {/* 4. SHARE / PREVIEW MODAL */}
+      {selectedPavti && settings && (
         <>
           <div className="fixed left-[-9999px] top-[-9999px]">
             <PavtiCard
-              id="pending-marked-pavti-element"
-              pavti={generatedPavti}
+              id="due-preview-pavti-element"
+              pavti={selectedPavti}
               settings={settings}
             />
           </div>
           <PavtiShareModal
             isOpen={isShareModalOpen}
-            onClose={() => setIsShareModalOpen(false)}
-            pavti={generatedPavti}
+            onClose={() => {
+              setIsShareModalOpen(false);
+              setSelectedPavti(null);
+            }}
+            pavti={selectedPavti}
             settings={settings}
-            elementId="pending-marked-pavti-element"
+            elementId="due-preview-pavti-element"
           />
         </>
       )}

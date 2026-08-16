@@ -1,67 +1,68 @@
 'use client';
 
 import React from 'react';
-import { Pavti, MandalSettings } from '@/types';
+import { MandalSettings, Pavti } from '@/types';
 import { formatIndianCurrency } from '@/lib/utils/number-to-words';
+import { useLanguage } from '@/lib/context/language-context';
 
 interface PavtiCardProps {
   pavti: Pavti;
   settings: MandalSettings;
   id?: string;
-  isPrintMode?: boolean;
 }
 
-export const PavtiCard = React.forwardRef<HTMLDivElement, PavtiCardProps>(
-  ({ pavti, settings, id = 'pavti-card-element', isPrintMode = false }, ref) => {
-    const enabledDesignations = (settings?.designations || []).filter((d) => d.enabled);
+export function PavtiCard({ pavti, settings, id = 'digital-pavti-receipt' }: PavtiCardProps) {
+  const { language } = useLanguage();
+  const enabledDesignations = (settings?.designations || []).filter((d) => d.enabled && d.name);
+  const isDue = pavti.status === 'DUE' || !pavti.receiptNumber;
 
-    return (
+  return (
+    <div className="w-full max-w-xl mx-auto p-2 sm:p-4">
+      {/* 
+        Official Traditional Indian Mandal Receipt Book Layout
+        Theme: Saffron / Gold / Warm White with decorative ethnic borders
+      */}
       <div
         id={id}
-        ref={ref}
-        className="w-full max-w-[650px] mx-auto bg-[#FFFDF7] text-stone-900 rounded-xl p-6 sm:p-8 shadow-pavti border-2 border-amber-600/80 relative overflow-hidden font-sans select-none"
+        className="relative bg-[#fffdfa] text-stone-900 border-[3px] border-amber-600 rounded-2xl shadow-pavti overflow-hidden p-6 sm:p-8 space-y-4"
         style={{
-          boxShadow: isPrintMode ? 'none' : undefined,
-          backgroundImage: 'radial-gradient(#fed7aa 0.75px, #fffdf7 0.75px)',
-          backgroundSize: '16px 16px',
+          boxShadow: '0 10px 30px -5px rgba(234, 88, 12, 0.15), 0 0 0 1px rgba(217, 119, 6, 0.2)',
         }}
       >
-        {/* Double Ornate Border Accents */}
-        <div className="absolute inset-2 border border-amber-500/40 rounded-lg pointer-events-none" />
-        <div className="absolute top-3 left-3 w-5 h-5 border-t-2 border-l-2 border-amber-700 pointer-events-none" />
-        <div className="absolute top-3 right-3 w-5 h-5 border-t-2 border-r-2 border-amber-700 pointer-events-none" />
-        <div className="absolute bottom-3 left-3 w-5 h-5 border-b-2 border-l-2 border-amber-700 pointer-events-none" />
-        <div className="absolute bottom-3 right-3 w-5 h-5 border-b-2 border-r-2 border-amber-700 pointer-events-none" />
-
-        {/* Watermark Motif */}
-        <div className="absolute inset-0 flex items-center justify-center opacity-[0.035] pointer-events-none select-none">
-          <span className="text-[12rem] font-bold font-devanagari text-amber-900">ॐ</span>
+        {/* Subtle Watermark in Center */}
+        <div className="absolute inset-0 flex items-center justify-center opacity-5 pointer-events-none select-none text-[16rem] font-black font-devanagari text-orange-950">
+          ॐ
         </div>
 
-        {/* TOP BANNER / SLOGANS */}
+        {/* TOP HEADER SECTION: MANDAL IDENTITY */}
         <div className="relative z-10 text-center space-y-1 pb-3 border-b-2 border-amber-600/60">
-          <div className="flex items-center justify-between text-xs font-bold text-amber-800 tracking-wider">
+          {/* TOP AUSPICIOUS SLOGAN (Mandal identity remains Marathi) */}
+          <div className="flex items-center justify-center gap-2 text-xs sm:text-sm font-bold text-amber-900 font-devanagari">
             <span>{settings?.taglineMarathi || '॥ श्री गणेशाय नमः ॥'}</span>
-            <span className="bg-amber-100 text-amber-900 px-3 py-0.5 rounded-full border border-amber-300 text-[11px] font-semibold">
-              सन {settings?.year || '२०२६-२०२७'}
-            </span>
-            <span>{settings?.sloganMarathi || '॥ गणपती बाप्पा मोरया ॥'}</span>
+            <span>•</span>
+            <span>सन {settings?.year || '२०२६'}</span>
+            {settings?.sloganMarathi && (
+              <>
+                <span>•</span>
+                <span>{settings.sloganMarathi}</span>
+              </>
+            )}
           </div>
 
-          {/* MANDAL TITLE */}
+          {/* MANDAL TITLE (Mandal identity name always in Marathi) */}
           <div className="pt-2">
             <h1 className="text-2xl sm:text-3xl font-extrabold text-orange-700 font-devanagari tracking-tight drop-shadow-sm">
               {settings?.mandalNameMarathi || 'मोरया गणेशोत्सव मंडळ'}
             </h1>
-            {settings?.mandalNameEnglish && (
-              <h2 className="text-xs sm:text-sm font-semibold text-stone-600 tracking-wide uppercase mt-0.5">
-                {settings.mandalNameEnglish}
-              </h2>
+            {settings?.addressMarathi && (
+              <div className="text-xs sm:text-sm font-semibold text-amber-900 font-devanagari mt-0.5">
+                {settings.addressMarathi}
+              </div>
             )}
           </div>
 
           {/* LOCATION & REG DETAILS */}
-          <div className="text-xs text-stone-600 flex flex-wrap items-center justify-center gap-x-3 gap-y-0.5 pt-0.5">
+          <div className="text-xs text-stone-600 flex flex-wrap items-center justify-center gap-x-3 gap-y-0.5 pt-0.5 font-devanagari">
             {settings?.locationMarathi && <span>📍 {settings.locationMarathi}</span>}
             {settings?.regNumber && <span>| नोंदणी क्र. {settings.regNumber}</span>}
             {settings?.contactNumber && <span>| 📞 {settings.contactNumber}</span>}
@@ -71,15 +72,25 @@ export const PavtiCard = React.forwardRef<HTMLDivElement, PavtiCardProps>(
         {/* RECEIPT NUMBER & DATE HEADER */}
         <div className="relative z-10 flex items-center justify-between py-3 border-b border-amber-200/80 text-sm">
           <div className="flex items-center gap-2">
-            <span className="font-bold text-amber-900 font-devanagari">पावती क्र. :</span>
-            <span className="font-mono font-bold text-base px-2.5 py-0.5 bg-amber-50 text-orange-800 border border-amber-300 rounded shadow-inner">
-              {pavti.receiptNumber}
+            <span className="font-bold text-amber-900 font-devanagari">
+              {language === 'mr' ? 'पावती क्र. :' : 'Receipt No :'}
             </span>
+            {isDue ? (
+              <span className="font-bold text-xs sm:text-sm px-3 py-1 bg-amber-100 text-amber-900 border-2 border-amber-400 rounded-lg shadow-sm font-devanagari">
+                {language === 'mr' ? 'बाकी (DUE)' : 'DUE (बाकी)'}
+              </span>
+            ) : (
+              <span className="font-mono font-bold text-base px-2.5 py-0.5 bg-amber-50 text-orange-800 border border-amber-300 rounded shadow-inner">
+                #{pavti.receiptNumber}
+              </span>
+            )}
           </div>
 
           <div className="flex items-center gap-2">
-            <span className="font-bold text-amber-900 font-devanagari">दिनांक :</span>
-            <span className="font-medium text-stone-800">
+            <span className="font-bold text-amber-900 font-devanagari">
+              {language === 'mr' ? 'दिनांक :' : 'Date :'}
+            </span>
+            <span className="font-medium text-stone-800 font-mono">
               {pavti.date}
             </span>
           </div>
@@ -97,15 +108,29 @@ export const PavtiCard = React.forwardRef<HTMLDivElement, PavtiCardProps>(
             </div>
           </div>
 
-          {/* MOBILE NUMBER */}
-          {pavti.donorMobile && (
-            <div className="flex flex-col sm:flex-row sm:items-baseline gap-1 sm:gap-2">
-              <span className="text-xs sm:text-sm font-bold text-amber-900 whitespace-nowrap font-devanagari">
-                मोबाईल क्र. (Mobile) :
-              </span>
-              <div className="flex-1 text-sm font-medium text-stone-800 border-b border-dotted border-amber-600/70 pb-0.5 px-1 font-mono">
-                {pavti.donorMobile}
-              </div>
+          {/* MOBILE NUMBER & ADDRESS */}
+          {(pavti.donorMobile || pavti.donorAddress) && (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              {pavti.donorMobile && (
+                <div className="flex items-baseline gap-2">
+                  <span className="text-xs font-bold text-amber-900 whitespace-nowrap font-devanagari">
+                    मोबाईल (Mobile) :
+                  </span>
+                  <div className="flex-1 text-xs sm:text-sm font-medium text-stone-800 border-b border-dotted border-amber-600/70 pb-0.5 px-1 font-mono">
+                    {pavti.donorMobile}
+                  </div>
+                </div>
+              )}
+              {pavti.donorAddress && (
+                <div className="flex items-baseline gap-2">
+                  <span className="text-xs font-bold text-amber-900 whitespace-nowrap font-devanagari">
+                    पत्ता (Address) :
+                  </span>
+                  <div className="flex-1 text-xs sm:text-sm font-medium text-stone-800 border-b border-dotted border-amber-600/70 pb-0.5 px-1 truncate font-devanagari">
+                    {pavti.donorAddress}
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
@@ -126,29 +151,39 @@ export const PavtiCard = React.forwardRef<HTMLDivElement, PavtiCardProps>(
             )}
           </div>
 
-          {/* AMOUNT BOX & PAYMENT MODE */}
-          <div className="pt-2 flex flex-col sm:flex-row items-center justify-between gap-3 bg-amber-50/80 p-3.5 rounded-lg border border-amber-300">
+          {/* AMOUNT BOX & PAYMENT STATUS */}
+          <div className={`pt-2 flex flex-col sm:flex-row items-center justify-between gap-3 p-3.5 rounded-xl border ${
+            isDue ? 'bg-amber-50/90 border-amber-400' : 'bg-amber-50/80 border-amber-300'
+          }`}>
             {/* Amount Box */}
             <div className="flex items-center gap-3 w-full sm:w-auto">
-              <span className="font-bold text-base text-amber-950 font-devanagari">रक्कम :</span>
-              <div className="px-4 py-1.5 bg-orange-600 text-white font-extrabold text-xl sm:text-2xl rounded-lg shadow font-mono tracking-tight">
+              <span className="font-bold text-base text-amber-950 font-devanagari">
+                {isDue ? (language === 'mr' ? 'बाकी रक्कम :' : 'Due Amount :') : (language === 'mr' ? 'जमा रक्कम :' : 'Amount Paid :')}
+              </span>
+              <div className={`px-4 py-1.5 text-white font-extrabold text-xl sm:text-2xl rounded-lg shadow font-mono tracking-tight ${
+                isDue ? 'bg-amber-600' : 'bg-orange-600'
+              }`}>
                 {formatIndianCurrency(pavti.amount)}
               </div>
             </div>
 
-            {/* Payment Method & Ref */}
-            <div className="flex flex-wrap items-center gap-2 text-xs sm:text-sm text-stone-700 w-full sm:w-auto justify-start sm:justify-end">
-              <span className="font-semibold text-amber-900">प्रकार :</span>
-              <span className="px-2.5 py-0.5 bg-white border border-amber-300 rounded font-semibold text-orange-800">
-                {pavti.paymentMethod === 'CASH'
-                  ? 'रोख (Cash)'
-                  : pavti.paymentMethod === 'UPI'
-                  ? 'UPI / Online'
-                  : 'इतर (Other)'}
+            {/* Payment Status & Ref */}
+            <div className="flex flex-wrap items-center gap-2 text-xs sm:text-sm text-stone-700 w-full sm:w-auto justify-start sm:justify-end font-devanagari">
+              <span className="font-semibold text-amber-900">
+                {isDue ? 'स्थिती :' : 'प्रकार :'}
               </span>
+              {isDue ? (
+                <span className="px-3 py-1 bg-amber-200 border border-amber-400 rounded-md font-bold text-amber-950">
+                  {language === 'mr' ? 'बाकी (DUE)' : 'DUE (बाकी)'}
+                </span>
+              ) : (
+                <span className="px-2.5 py-0.5 bg-white border border-amber-300 rounded font-semibold text-orange-800">
+                  {pavti.paymentMethod === 'UPI' ? 'UPI / Online' : 'रोख (Cash)'}
+                </span>
+              )}
               {pavti.transactionReference && (
                 <span className="text-xs text-stone-500 font-mono">
-                  (UTR/Ref: {pavti.transactionReference})
+                  (Ref: {pavti.transactionReference})
                 </span>
               )}
             </div>
@@ -177,29 +212,29 @@ export const PavtiCard = React.forwardRef<HTMLDivElement, PavtiCardProps>(
             </div>
           )}
 
-          {/* DIGITAL STAMP (NO FAKE PHYSICAL SIGNATURES) */}
+          {/* DIGITAL STAMP */}
           <div className="flex flex-col items-center">
-            <div className="stamp-paid">
-              <span className="text-xs tracking-wider">अधिकृत पावती</span>
-              <span className="text-sm font-black tracking-widest font-mono">PAID / जमा</span>
-            </div>
-            {pavti.hostName && (
-              <span className="text-[10px] text-stone-500 mt-1">
-                संकलक : {pavti.hostName}
-              </span>
+            {isDue ? (
+              <div className="px-4 py-2 rounded-xl border-2 border-dashed border-amber-500 bg-amber-50 text-center shadow-inner">
+                <span className="text-[10px] uppercase font-bold text-amber-800 tracking-wider block font-devanagari">
+                  अधिकृत डिजिटल नोंद
+                </span>
+                <span className="text-sm font-black text-amber-900 font-devanagari tracking-wider">
+                  बाकी / DUE
+                </span>
+              </div>
+            ) : (
+              <div className="stamp-paid">
+                <span className="text-xs tracking-wider">अधिकृत पावती</span>
+                <span className="text-sm font-black tracking-widest font-mono">PAID / जमा</span>
+              </div>
             )}
+            <span className="text-[9px] text-stone-400 font-mono pt-1">
+              Auth ID: {pavti.id.substring(0, 10)}
+            </span>
           </div>
         </div>
-
-        {/* TEST MODE WATERMARK BANNER IF APPLICABLE */}
-        {pavti.mode === 'TEST' && (
-          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 -rotate-12 border-4 border-red-500/30 text-red-600/30 font-black text-4xl sm:text-5xl px-8 py-2 rounded-xl pointer-events-none uppercase tracking-widest select-none">
-            TEST MODE - नमुना
-          </div>
-        )}
       </div>
-    );
-  }
-);
-
-PavtiCard.displayName = 'PavtiCard';
+    </div>
+  );
+}

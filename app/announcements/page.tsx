@@ -1,5 +1,5 @@
 import React from 'react';
-import { Bell, Calendar, MapPin } from 'lucide-react';
+import { Bell, Calendar, MapPin, Clock } from 'lucide-react';
 import { getStorageProvider } from '@/lib/storage';
 import { Card, CardContent } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
@@ -11,7 +11,10 @@ export default async function AnnouncementsPage() {
   await storage.init();
 
   const settings = await storage.getSettings();
-  const announcements = await storage.getAnnouncements(true);
+  const allAnnouncements = await storage.getAnnouncements(true);
+  const announcements = allAnnouncements.filter(
+    (a) => a.status === 'PUBLISHED' || (a.status === undefined && a.active)
+  );
 
   return (
     <div className="max-w-4xl mx-auto space-y-6">
@@ -23,10 +26,10 @@ export default async function AnnouncementsPage() {
           </div>
           <div>
             <h1 className="text-2xl sm:text-3xl font-extrabold font-devanagari text-stone-900">
-              मंडळ सूचना फलक
+              मंडळ अधिकृत सूचना फलक
             </h1>
             <p className="text-xs sm:text-sm text-stone-500 font-devanagari">
-              {settings?.mandalNameMarathi} तर्फे जाहीर करण्यात आलेल्या सर्व अधिकृत सूचना
+              {settings?.mandalNameMarathi || 'मोरया गणेशोत्सव मंडळ'} तर्फे जाहीर करण्यात आलेल्या सर्व अधिकृत सूचना
             </p>
           </div>
         </div>
@@ -55,10 +58,16 @@ export default async function AnnouncementsPage() {
                     ) : (
                       <Badge variant="gold">सूचना</Badge>
                     )}
-                    <span className="text-xs text-stone-500 flex items-center gap-1 font-medium">
+                    <span className="text-xs text-stone-500 flex items-center gap-1 font-medium font-mono">
                       <Calendar className="w-3.5 h-3.5" />
                       {item.date}
                     </span>
+                    {item.time && (
+                      <span className="text-xs text-stone-500 flex items-center gap-1 font-medium font-mono">
+                        <Clock className="w-3.5 h-3.5" />
+                        {item.time}
+                      </span>
+                    )}
                   </div>
                 </div>
 
@@ -71,7 +80,7 @@ export default async function AnnouncementsPage() {
                 </p>
 
                 {item.venue && (
-                  <div className="pt-2 text-xs font-semibold text-amber-900 flex items-center gap-1.5 bg-amber-50 p-2.5 rounded-lg border border-amber-200/80">
+                  <div className="pt-2 text-xs font-semibold text-amber-900 flex items-center gap-1.5 bg-amber-50 p-2.5 rounded-lg border border-amber-200/80 font-devanagari">
                     <MapPin className="w-4 h-4 text-orange-600 flex-shrink-0" />
                     <span>स्थान / पत्ता: {item.venue}</span>
                   </div>

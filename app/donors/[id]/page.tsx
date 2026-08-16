@@ -14,9 +14,12 @@ import {
   Eye,
   Share2,
   PlusCircle,
+  Trash2,
+  AlertTriangle,
 } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
+import { Modal } from '@/components/ui/Modal';
 import { Badge } from '@/components/ui/Badge';
 import { useAppMode } from '@/lib/context/mode-context';
 import { Donor, Payment, Pavti, MandalSettings } from '@/types';
@@ -38,6 +41,11 @@ export default function DonorDetailPage({
   const [pavtis, setPavtis] = useState<Pavti[]>([]);
   const [settings, setSettings] = useState<MandalSettings | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+
+  // Delete / Archive Modal State
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState('');
 
   // Share Modal
   const [selectedPavti, setSelectedPavti] = useState<Pavti | null>(null);
@@ -68,6 +76,27 @@ export default function DonorDetailPage({
     loadDonorData();
   }, [id, mode]);
 
+  const handleDeleteMember = async () => {
+    setIsDeleting(true);
+    setDeleteError('');
+
+    try {
+      const res = await fetch(`/api/donors/${id}?mode=${mode}`, {
+        method: 'DELETE',
+      });
+
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'देणगीदार हटवण्यात त्रुटी आली.');
+
+      alert(data.message);
+      router.push('/donors');
+    } catch (err: any) {
+      setDeleteError(err.message || 'त्रुटी आली.');
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="text-center py-20 font-devanagari text-stone-600">
@@ -87,6 +116,8 @@ export default function DonorDetailPage({
     );
   }
 
+  const hasHistory = payments.length > 0 || pavtis.length > 0;
+
   return (
     <div className="max-w-4xl mx-auto space-y-6 pb-12">
       {/* Header */}
@@ -99,21 +130,38 @@ export default function DonorDetailPage({
             <ArrowLeft className="w-5 h-5" />
           </button>
           <div>
-            <h1 className="text-xl sm:text-2xl font-black font-devanagari text-stone-900">
-              {donor.name}
-            </h1>
+            <div className="flex items-center gap-2">
+              <h1 className="text-xl sm:text-2xl font-black font-devanagari text-stone-900">
+                {donor.name}
+              </h1>
+              {donor.isArchived && (
+                <Badge variant="warning">निष्क्रिय (Archived)</Badge>
+              )}
+            </div>
             <p className="text-xs text-stone-500 font-mono">
               {donor.mobile || 'मोबाईल नोंद नाही'} • नोंदणी दिनांक: {donor.createdAt.split('T')[0]}
             </p>
           </div>
         </div>
 
-        <Link href="/pavti/new">
-          <Button variant="primary" size="sm" className="font-devanagari flex items-center gap-1.5 shadow">
-            <PlusCircle className="w-4 h-4" />
-            <span>या देणगीदारासाठी पावती फाडा</span>
+        <div className="flex items-center gap-2">
+          <Link href="/pavti/new">
+            <Button variant="primary" size="sm" className="font-devanagari flex items-center gap-1.5 shadow">
+              <PlusCircle className="w-4 h-4" />
+              <span>या देणगीदारासाठी पावती फाडा</span>
+            </Button>
+          </Link>
+
+          <Button
+            variant="danger"
+            size="sm"
+            onClick={() => setIsDeleteModalOpen(true)}
+            className="font-devanagari flex items-center gap-1.5"
+          >
+            <Trash2 className="w-4 h-4" />
+            <span>हटवा (Delete)</span>
           </Button>
-        </Link>
+        </div>
       </div>
 
       {/* DONOR SUMMARY STATS */}
@@ -159,93 +207,157 @@ export default function DonorDetailPage({
           <span>पावत्यांचा इतिहास (Pavti Records)</span>
         </h2>
 
-        {payments.length === 0 ? (
-          <Card className="border-dashed border-stone-300">
-            <CardContent className="p-8 text-center text-xs text-stone-500 font-devanagari">
-              अद्याप कोणतीही पावती नोंदवलेली नाही.
+        {pavtis.length === 0 ? (
+          <Card className="border-stone-200">
+            <CardContent className="p-8 text-center text-stone-400 font-devanagari">
+              या देणगीदारासाठी अद्याप कोणतीही पावती फाडली गेलेली नाही.
             </CardContent>
           </Card>
         ) : (
-          <div className="bg-white rounded-xl border border-stone-200 overflow-hidden shadow-sm">
-            <table className="w-full text-left text-xs text-stone-700">
-              <thead className="bg-stone-50 text-stone-600 font-bold border-b border-stone-200 uppercase font-devanagari">
-                <tr>
-                  <th className="px-4 py-3">पावती क्र.</th>
-                  <th className="px-4 py-3">दिनांक</th>
-                  <th className="px-4 py-3">रक्कम</th>
-                  <th className="px-4 py-3">स्थिती</th>
-                  <th className="px-4 py-3">प्रकार</th>
-                  <th className="px-4 py-3 text-right">कृती</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-stone-100">
-                {payments.map((p) => (
-                  <tr key={p.id} className="hover:bg-amber-50/40 transition-colors">
-                    <td className="px-4 py-3 font-mono font-bold text-orange-800">
-                      {p.receiptNumber ? `#${p.receiptNumber}` : '- (बाकी)'}
-                    </td>
-                    <td className="px-4 py-3 text-stone-600 font-mono">{p.date}</td>
-                    <td className="px-4 py-3 font-bold text-stone-900 font-mono text-sm">
-                      {formatIndianCurrency(p.receivedAmount || p.expectedAmount)}
-                    </td>
-                    <td className="px-4 py-3">
-                      <Badge variant={p.status === 'PAID' ? 'success' : 'warning'}>
-                        {p.status === 'PAID' ? 'जमा (Paid)' : 'बाकी (Pending)'}
+          <div className="space-y-3">
+            {pavtis.map((pavti) => (
+              <Card
+                key={pavti.id}
+                className="border-stone-200 hover:border-amber-300 transition-colors shadow-sm"
+              >
+                <CardContent className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2">
+                      <span className="font-mono font-bold text-sm text-orange-800">
+                        {pavti.receiptNumber ? `#${pavti.receiptNumber}` : 'बाकी (DUE)'}
+                      </span>
+                      <span className="text-xs text-stone-400 font-mono">
+                        📅 {pavti.date}
+                      </span>
+                      <Badge variant={pavti.paymentMethod === 'UPI' ? 'info' : 'gold'}>
+                        {pavti.paymentMethod === 'UPI' ? 'UPI' : 'रोख (Cash)'}
                       </Badge>
-                    </td>
-                    <td className="px-4 py-3 font-devanagari">
-                      {p.paymentMethod === 'CASH' ? 'रोख' : 'UPI'}
-                    </td>
-                    <td className="px-4 py-3 text-right">
-                      {p.status === 'PAID' && (
-                        <div className="flex items-center justify-end gap-1.5">
-                          <Link
-                            href={`/pavti/${p.receiptNumber || p.id}`}
-                            className="p-1.5 text-stone-600 hover:text-orange-600 rounded hover:bg-stone-100"
-                            title="पावती पहा"
-                          >
-                            <Eye className="w-4 h-4" />
-                          </Link>
-                          <button
-                            onClick={() => {
-                              const foundPavti = pavtis.find((pav) => pav.paymentId === p.id);
-                              if (foundPavti) {
-                                setSelectedPavti(foundPavti);
-                                setIsShareModalOpen(true);
-                              }
-                            }}
-                            className="p-1.5 text-emerald-600 hover:text-emerald-700 rounded hover:bg-emerald-50"
-                            title="शेअर करा"
-                          >
-                            <Share2 className="w-4 h-4" />
-                          </button>
-                        </div>
+                      {pavti.status === 'DUE' && (
+                        <Badge variant="warning">बाकी (DUE)</Badge>
                       )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+                    </div>
+                    <div className="text-xs text-stone-600 font-devanagari">
+                      प्रतिनिधी: {pavti.hostName}
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-4 self-end sm:self-center">
+                    <div className="text-right">
+                      <div className="text-lg font-black text-stone-900 font-mono">
+                        {formatIndianCurrency(pavti.amount)}
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-1.5">
+                      {pavti.receiptNumber && (
+                        <Link href={`/pavti/${pavti.receiptNumber}`}>
+                          <Button variant="outline" size="sm" className="p-2">
+                            <Eye className="w-4 h-4 text-stone-600" />
+                          </Button>
+                        </Link>
+                      )}
+                      <Button
+                        variant="gold"
+                        size="sm"
+                        onClick={() => {
+                          setSelectedPavti(pavti);
+                          setIsShareModalOpen(true);
+                        }}
+                        className="flex items-center gap-1 font-devanagari"
+                      >
+                        <Share2 className="w-3.5 h-3.5" />
+                        <span>शेअर</span>
+                      </Button>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
           </div>
         )}
       </div>
 
-      {/* SHARE MODAL IF TRIGGERED */}
+      {/* DELETE / ARCHIVE CONFIRMATION MODAL */}
+      <Modal
+        isOpen={isDeleteModalOpen}
+        onClose={() => setIsDeleteModalOpen(false)}
+        title={
+          <div className="flex items-center gap-2 text-red-600 font-devanagari">
+            <AlertTriangle className="w-5 h-5" />
+            <span>देणगीदार हटवण्याची पुष्टी करा</span>
+          </div>
+        }
+        description="तुम्हाला खरोखर हा देणगीदार सदस्य हटवायचा आहे का?"
+        maxWidth="md"
+      >
+        <div className="space-y-4 pt-1">
+          {deleteError && (
+            <div className="p-3 bg-red-100 text-red-800 rounded-lg text-xs font-bold font-devanagari">
+              {deleteError}
+            </div>
+          )}
+
+          <div className="p-3.5 bg-stone-100 rounded-xl text-xs text-stone-800 font-devanagari space-y-1.5 border border-stone-200">
+            <div><strong>नाव:</strong> {donor.name}</div>
+            <div><strong>मोबाईल:</strong> {donor.mobile || '-'}</div>
+            <div><strong>एकूण जमा:</strong> {formatIndianCurrency(donor.totalContributed)} ({donor.pavtiCount} पावत्या)</div>
+          </div>
+
+          {hasHistory ? (
+            <div className="p-3 bg-amber-50 border border-amber-300 rounded-xl text-xs text-amber-900 font-devanagari space-y-1">
+              <div className="font-bold">🛡️ आर्थिक इतिहास संरक्षण:</div>
+              <div className="text-[11px] text-amber-800">
+                या देणगीदाराच्या नावावर आर्थिक पावत्या असल्याने जमा हिशोबाचा ताळेबंद सुरक्षित ठेवण्यासाठी हे रेकॉर्ड निष्क्रिय (Archive) केले जाईल. मूळ जमा रकमेचा हिशोब अबाधित राहील.
+              </div>
+            </div>
+          ) : (
+            <div className="p-3 bg-stone-50 border border-stone-200 rounded-xl text-xs text-stone-600 font-devanagari">
+              या देणगीदाराचा कोणताही आर्थिक इतिहास नाही. हे रेकॉर्ड कायमस्वरूपी हटवले जाईल.
+            </div>
+          )}
+
+          <div className="pt-3 flex items-center justify-end gap-2 border-t border-stone-100">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => setIsDeleteModalOpen(false)}
+            >
+              रद्द करा (Cancel)
+            </Button>
+            <Button
+              type="button"
+              variant="danger"
+              size="sm"
+              isLoading={isDeleting}
+              onClick={handleDeleteMember}
+              className="font-devanagari font-bold"
+            >
+              {hasHistory ? 'होय, निष्क्रिय (Archive) करा' : 'होय, कायमचे हटवा'}
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* SHARE / PREVIEW MODAL */}
       {selectedPavti && settings && (
         <>
           <div className="fixed left-[-9999px] top-[-9999px]">
             <PavtiCard
-              id="donor-history-pavti-element"
+              id="donor-pavti-preview-element"
               pavti={selectedPavti}
               settings={settings}
             />
           </div>
           <PavtiShareModal
             isOpen={isShareModalOpen}
-            onClose={() => setIsShareModalOpen(false)}
+            onClose={() => {
+              setIsShareModalOpen(false);
+              setSelectedPavti(null);
+            }}
             pavti={selectedPavti}
             settings={settings}
-            elementId="donor-history-pavti-element"
+            elementId="donor-pavti-preview-element"
           />
         </>
       )}

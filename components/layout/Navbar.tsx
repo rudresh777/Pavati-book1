@@ -6,13 +6,11 @@ import { usePathname, useRouter } from 'next/navigation';
 import {
   Menu,
   X,
-  FileText,
   PlusCircle,
   Clock,
   Users,
   CreditCard,
   Settings,
-  ShieldAlert,
   LogOut,
   Sparkles,
   Home,
@@ -20,9 +18,10 @@ import {
   Sliders,
   Database,
   History,
+  Languages,
 } from 'lucide-react';
 import { useAppMode } from '@/lib/context/mode-context';
-import { Badge } from '@/components/ui/Badge';
+import { useLanguage } from '@/lib/context/language-context';
 import { cn } from '@/lib/utils/cn';
 
 interface NavbarProps {
@@ -34,6 +33,7 @@ export function Navbar({ mandalName = 'मोरया गणेशोत्स�
   const pathname = usePathname();
   const router = useRouter();
   const { mode, toggleMode, user } = useAppMode();
+  const { language, setLanguage, t } = useLanguage();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
 
@@ -54,26 +54,26 @@ export function Navbar({ mandalName = 'मोरया गणेशोत्स�
   const isSuperAdmin = user?.role === 'SUPER_ADMIN';
 
   const authNavItems = [
-    { href: '/dashboard', label: 'डॅशबोर्ड', icon: Home },
-    { href: '/pavti/new', label: 'नवीन पावती', icon: PlusCircle, highlight: true },
-    { href: '/pending', label: 'बाकी यादी', icon: Clock },
-    { href: '/donors', label: 'देणगीदार', icon: Users },
-    { href: '/payments', label: 'जमा नोंदी', icon: CreditCard },
+    { href: '/dashboard', label: t('nav.dashboard'), icon: Home },
+    { href: '/pavti/new', label: t('nav.newPavti'), icon: PlusCircle, highlight: true },
+    { href: '/pending', label: t('nav.pending'), icon: Clock },
+    { href: '/donors', label: t('nav.donors'), icon: Users },
+    { href: '/payments', label: t('nav.ledger'), icon: CreditCard },
   ];
 
   const adminNavItems = [
-    { href: '/settings/mandal', label: 'मंडळ माहिती', icon: Sliders },
-    { href: '/settings/users', label: 'होस्ट व्यवस्थापन', icon: Users },
-    { href: '/settings/backup', label: 'डेटा बॅकअप / चाचणी', icon: Database },
-    { href: '/announcements/manage', label: 'सूचना व्यवस्थापन', icon: Bell },
-    { href: '/audit-log', label: 'ऑडिट लॉग', icon: History },
+    { href: '/settings/mandal', label: t('nav.mandalSettings'), icon: Sliders },
+    { href: '/settings/users', label: t('nav.hostManagement'), icon: Users },
+    { href: '/settings/backup', label: t('nav.backupData'), icon: Database },
+    { href: '/announcements/manage', label: t('nav.announcementManage'), icon: Bell },
+    { href: '/audit-log', label: t('nav.auditLog'), icon: History },
   ];
 
   return (
     <nav className="bg-white border-b border-amber-200/70 sticky top-0 z-40 shadow-sm">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
-          {/* Logo & Mandal Title */}
+          {/* Logo & Mandal Title (Identity name ALWAYS remains Marathi) */}
           <Link href={isAuth ? '/dashboard' : '/'} className="flex items-center gap-2.5 group">
             <div className="w-10 h-10 rounded-full bg-gradient-to-br from-orange-500 to-amber-600 flex items-center justify-center text-white font-devanagari font-black text-xl shadow-md border-2 border-amber-300 group-hover:scale-105 transition-transform">
               ॐ
@@ -83,7 +83,7 @@ export function Navbar({ mandalName = 'मोरया गणेशोत्स�
                 {mandalName}
               </span>
               <span className="text-[10px] text-amber-800 font-semibold tracking-wider uppercase">
-                डिजिटल पावती पुस्तक
+                {t('nav.digitalPavtiBook')}
               </span>
             </div>
           </Link>
@@ -102,7 +102,7 @@ export function Navbar({ mandalName = 'मोरया गणेशोत्स�
                       className={cn(
                         'flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold font-devanagari transition-all',
                         item.highlight
-                          ? 'bg-orange-600 hover:bg-orange-700 text-white shadow-sm'
+                          ? 'bg-orange-600 hover:bg-orange-700 text-white shadow-sm font-bold'
                           : isActive
                           ? 'bg-amber-100/80 text-orange-900 font-bold border border-amber-300/60'
                           : 'text-stone-600 hover:bg-amber-50/60 hover:text-orange-900'
@@ -119,7 +119,7 @@ export function Navbar({ mandalName = 'मोरया गणेशोत्स�
                   <div className="relative group">
                     <button className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-stone-600 hover:bg-amber-50 hover:text-orange-900 transition-colors font-devanagari">
                       <Settings className="w-3.5 h-3.5 text-amber-700" />
-                      <span>व्यवस्थापन</span>
+                      <span>{t('nav.management')}</span>
                     </button>
                     <div className="absolute right-0 mt-1 w-52 bg-white rounded-xl shadow-xl border border-stone-200 py-1.5 hidden group-hover:block animate-in fade-in-50">
                       {adminNavItems.map((item) => {
@@ -148,7 +148,7 @@ export function Navbar({ mandalName = 'मोरया गणेशोत्स�
                     pathname === '/' ? 'text-orange-800 font-bold' : 'text-stone-600 hover:text-orange-900'
                   )}
                 >
-                  मुखपृष्ठ
+                  {t('nav.home')}
                 </Link>
                 <Link
                   href="/announcements"
@@ -159,14 +159,42 @@ export function Navbar({ mandalName = 'मोरया गणेशोत्स�
                       : 'text-stone-600 hover:text-orange-900'
                   )}
                 >
-                  मंडळ सूचना
+                  {t('nav.announcements')}
                 </Link>
               </>
             )}
           </div>
 
-          {/* Right Action Bar (Mode Toggle & User / Login) */}
-          <div className="hidden md:flex items-center gap-3">
+          {/* Right Action Bar (Language Switcher, Mode Toggle & User / Login) */}
+          <div className="hidden md:flex items-center gap-2.5">
+            {/* LANGUAGE SELECTOR */}
+            <div className="inline-flex items-center rounded-lg border border-amber-300 bg-amber-50/70 p-0.5 text-xs font-semibold shadow-sm">
+              <button
+                type="button"
+                onClick={() => setLanguage('mr')}
+                className={cn(
+                  'px-2.5 py-1 rounded-md text-xs font-devanagari transition-all',
+                  language === 'mr'
+                    ? 'bg-orange-600 text-white font-bold shadow-sm'
+                    : 'text-stone-700 hover:text-orange-900'
+                )}
+              >
+                मराठी
+              </button>
+              <button
+                type="button"
+                onClick={() => setLanguage('en')}
+                className={cn(
+                  'px-2.5 py-1 rounded-md text-xs font-sans transition-all',
+                  language === 'en'
+                    ? 'bg-orange-600 text-white font-bold shadow-sm'
+                    : 'text-stone-700 hover:text-orange-900'
+                )}
+              >
+                English
+              </button>
+            </div>
+
             {isAuth && (
               <button
                 onClick={toggleMode}
@@ -179,7 +207,7 @@ export function Navbar({ mandalName = 'मोरया गणेशोत्स�
                 )}
               >
                 <Sparkles className="w-3 h-3" />
-                <span>{mode === 'TEST' ? 'TEST MODE' : 'LIVE'}</span>
+                <span>{mode === 'TEST' ? 'TEST' : 'LIVE'}</span>
               </button>
             )}
 
@@ -190,13 +218,13 @@ export function Navbar({ mandalName = 'मोरया गणेशोत्स�
                     {user?.name}
                   </div>
                   <div className="text-[10px] text-amber-700 font-semibold">
-                    {user?.role === 'SUPER_ADMIN' ? 'सुपर ॲडमिन' : 'मंडळ प्रतिनिधी (Host)'}
+                    {user?.role === 'SUPER_ADMIN' ? t('nav.superAdmin') : t('nav.host')}
                   </div>
                 </div>
                 <button
                   onClick={handleLogout}
                   disabled={isLoggingOut}
-                  title="लॉगआउट"
+                  title={t('nav.logout')}
                   className="p-1.5 text-stone-400 hover:text-red-600 rounded-lg hover:bg-red-50 transition-colors"
                 >
                   <LogOut className="w-4 h-4" />
@@ -205,20 +233,44 @@ export function Navbar({ mandalName = 'मोरया गणेशोत्स�
             ) : (
               <Link
                 href="/login"
-                className="px-4 py-1.5 bg-orange-600 hover:bg-orange-700 text-white rounded-lg text-xs font-bold shadow-sm transition-all flex items-center gap-1.5"
+                className="px-3.5 py-1.5 bg-orange-600 hover:bg-orange-700 text-white rounded-lg text-xs font-bold shadow-sm transition-all flex items-center gap-1.5"
               >
-                <span>प्रतिनिधी लॉगिन</span>
+                <span>{t('nav.login')}</span>
               </Link>
             )}
           </div>
 
-          {/* Mobile Hamburger Button */}
+          {/* Mobile Right Controls */}
           <div className="flex items-center gap-2 md:hidden">
+            {/* Mobile Language Switcher */}
+            <div className="inline-flex items-center rounded-lg border border-amber-300 bg-amber-50 p-0.5 text-[11px] font-semibold">
+              <button
+                type="button"
+                onClick={() => setLanguage('mr')}
+                className={cn(
+                  'px-1.5 py-0.5 rounded text-[11px] font-devanagari transition-all',
+                  language === 'mr' ? 'bg-orange-600 text-white font-bold' : 'text-stone-700'
+                )}
+              >
+                मराठी
+              </button>
+              <button
+                type="button"
+                onClick={() => setLanguage('en')}
+                className={cn(
+                  'px-1.5 py-0.5 rounded text-[11px] font-sans transition-all',
+                  language === 'en' ? 'bg-orange-600 text-white font-bold' : 'text-stone-700'
+                )}
+              >
+                EN
+              </button>
+            </div>
+
             {isAuth && (
               <button
                 onClick={toggleMode}
                 className={cn(
-                  'px-2 py-0.5 rounded text-[11px] font-bold border',
+                  'px-1.5 py-0.5 rounded text-[10px] font-bold border',
                   mode === 'TEST'
                     ? 'bg-purple-100 text-purple-900 border-purple-300'
                     : 'bg-emerald-50 text-emerald-800 border-emerald-300'
@@ -227,6 +279,7 @@ export function Navbar({ mandalName = 'मोरया गणेशोत्स�
                 {mode === 'TEST' ? 'TEST' : 'LIVE'}
               </button>
             )}
+
             <button
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
               className="p-2 text-stone-600 hover:text-stone-900 rounded-lg hover:bg-stone-100"
@@ -246,14 +299,14 @@ export function Navbar({ mandalName = 'मोरया गणेशोत्स�
                 <div>
                   <div className="font-bold text-sm text-stone-900">{user?.name}</div>
                   <div className="text-xs text-amber-800 font-semibold">
-                    {user?.role === 'SUPER_ADMIN' ? 'सुपर ॲडमिन' : 'मंडळ प्रतिनिधी (Host)'}
+                    {user?.role === 'SUPER_ADMIN' ? t('nav.superAdmin') : t('nav.host')}
                   </div>
                 </div>
                 <button
                   onClick={handleLogout}
                   className="px-3 py-1 bg-white text-red-600 rounded-lg text-xs font-semibold border border-red-200"
                 >
-                  लॉगआउट
+                  {t('nav.logout')}
                 </button>
               </div>
 
@@ -282,7 +335,7 @@ export function Navbar({ mandalName = 'मोरया गणेशोत्स�
               {isSuperAdmin && (
                 <div className="pt-2 border-t border-stone-100 space-y-1">
                   <div className="text-[11px] font-bold uppercase text-stone-400 px-3 py-1">
-                    सुपर ॲडमिन व्यवस्थापन
+                    {t('nav.management')}
                   </div>
                   {adminNavItems.map((item) => {
                     const Icon = item.icon;
@@ -308,21 +361,21 @@ export function Navbar({ mandalName = 'मोरया गणेशोत्स�
                 onClick={() => setMobileMenuOpen(false)}
                 className="block px-3 py-2 rounded-lg text-sm font-semibold text-stone-700 hover:bg-stone-50 font-devanagari"
               >
-                मुखपृष्ठ (Home)
+                {t('nav.home')}
               </Link>
               <Link
                 href="/announcements"
                 onClick={() => setMobileMenuOpen(false)}
                 className="block px-3 py-2 rounded-lg text-sm font-semibold text-stone-700 hover:bg-stone-50 font-devanagari"
               >
-                मंडळ सूचना (Announcements)
+                {t('nav.announcements')}
               </Link>
               <Link
                 href="/login"
                 onClick={() => setMobileMenuOpen(false)}
                 className="block px-3 py-2.5 bg-orange-600 text-white rounded-lg text-sm font-bold text-center font-devanagari"
               >
-                मंडळ प्रतिनिधी लॉगिन (Host Login)
+                {t('nav.login')}
               </Link>
             </>
           )}

@@ -6,12 +6,10 @@ import {
   MessageCircle,
   Phone,
   MapPin,
-  LogIn,
-  CheckCircle2,
   FileCheck,
   ShieldCheck,
-  ArrowRight,
   Bell,
+  Clock,
 } from 'lucide-react';
 import { getStorageProvider } from '@/lib/storage';
 import { Card, CardContent } from '@/components/ui/Card';
@@ -24,7 +22,10 @@ export default async function HomePage() {
 
   const settings = await storage.getSettings();
   const announcements = await storage.getAnnouncements(true);
-  const latestAnnouncement = announcements[0] || null;
+  const publishedAnnouncements = announcements.filter(
+    (a) => (a as any).status === 'PUBLISHED' || ((a as any).status === undefined && a.active)
+  );
+  const latestAnnouncement = publishedAnnouncements[0] || null;
 
   return (
     <div className="space-y-12 pb-8">
@@ -36,45 +37,35 @@ export default async function HomePage() {
         </div>
 
         <div className="relative z-10 max-w-3xl mx-auto space-y-4">
-          {/* Top Marathi Badge */}
+          {/* 1. Top Marathi Badge */}
           <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-black/25 backdrop-blur-sm border border-amber-300/40 text-amber-200 text-xs sm:text-sm font-semibold tracking-wide font-devanagari">
             <Sparkles className="w-4 h-4 text-amber-300" />
-            <span>{settings?.taglineMarathi || '॥ श्री गणेशाय नमः ॥'}</span>
-            <span>•</span>
-            <span>सन {settings?.year || '२०२६'}</span>
+            <span>॥ श्री गणेशाय नमः ॥ • सन २०२६</span>
           </div>
 
-          {/* Main Mandal Name */}
+          {/* 2. Main Mandal Name (Marathi only) */}
           <h1 className="text-3xl sm:text-5xl font-black font-devanagari tracking-tight text-amber-50 drop-shadow-md leading-tight">
-            {settings?.mandalNameMarathi || 'मोरया गणेशोत्सव मंडळ'}
+            मोरया गणेशोत्सव मंडळ
           </h1>
-          {settings?.mandalNameEnglish && (
-            <p className="text-sm sm:text-base font-medium text-amber-100/90 tracking-wide uppercase">
-              {settings.mandalNameEnglish}
-            </p>
-          )}
 
-          {/* Slogan & Blessing */}
-          <div className="text-lg sm:text-xl font-bold font-devanagari text-amber-200 pt-1">
-            {settings?.sloganMarathi || '॥ गणपती बाप्पा मोरया ॥'}
+          {/* 3. Address under Mandal Name (Smaller font, centered/aligned, Marathi) */}
+          <div className="text-xs sm:text-sm font-semibold font-devanagari text-amber-200/95 tracking-wide -mt-1">
+            तापडिया नगर अकोला 444001
           </div>
 
-          <p className="text-xs sm:text-sm text-amber-100/90 max-w-2xl mx-auto leading-relaxed pt-2">
-            यंदाच्या गणेशोत्सवासाठी मंडळातर्फे सर्व भाविक भक्तांचे सहर्ष स्वागत! आपली देणगी / वर्गणी अधिकृत डिजिटल पावतीद्वारे जमा करा.
+          {/* 4. Slogan & Blessing */}
+          <div className="text-lg sm:text-xl font-bold font-devanagari text-amber-200 pt-1">
+            ॥ गणपती बाप्पा मोरया ॥
+          </div>
+
+          {/* 5. Welcome Text */}
+          <p className="text-xs sm:text-sm text-amber-100/90 max-w-2xl mx-auto leading-relaxed pt-2 font-devanagari">
+            यंदाच्या गणेशोत्सवासाठी मंडळातर्फे सर्व भाविक भक्तांचे सहर्ष स्वागत! आपली देणगी / वर्गणी अधिकृत डिजिटल पावतीद्वारे
           </p>
 
-          {/* Quick Action Buttons */}
-          <div className="flex flex-wrap items-center justify-center gap-3 pt-4">
-            <Link
-              href="/dashboard"
-              className="px-6 py-3 bg-white text-orange-800 hover:bg-amber-50 rounded-xl text-sm font-bold shadow-lg transition-all flex items-center gap-2 font-devanagari hover:scale-105"
-            >
-              <LogIn className="w-4 h-4 text-orange-600" />
-              <span>थेट डॅशबोर्डवर जा (Open Dashboard)</span>
-              <ArrowRight className="w-4 h-4 text-orange-600" />
-            </Link>
-
-            {settings?.whatsappGroupLink && (
+          {/* Quick Action: WhatsApp Group */}
+          {settings?.whatsappGroupLink && (
+            <div className="flex items-center justify-center pt-4">
               <a
                 href={settings.whatsappGroupLink}
                 target="_blank"
@@ -84,12 +75,12 @@ export default async function HomePage() {
                 <MessageCircle className="w-4 h-4" />
                 <span>मंडळ WhatsApp ग्रुप जॉईन करा</span>
               </a>
-            )}
-          </div>
+            </div>
+          )}
         </div>
       </section>
 
-      {/* LATEST ANNOUNCEMENT BANNER IF AVAILABLE */}
+      {/* LATEST PUBLISHED ANNOUNCEMENT BANNER */}
       {latestAnnouncement && (
         <section className="bg-amber-50 border-2 border-amber-300 rounded-2xl p-5 sm:p-6 shadow-sm">
           <div className="flex items-start gap-4">
@@ -98,10 +89,10 @@ export default async function HomePage() {
             </div>
             <div className="space-y-1.5 flex-1">
               <div className="flex flex-wrap items-center justify-between gap-2">
-                <span className="text-xs font-bold text-orange-800 uppercase tracking-wider bg-orange-100 px-2.5 py-0.5 rounded-full">
+                <span className="text-xs font-bold text-orange-800 uppercase tracking-wider bg-orange-100 px-2.5 py-0.5 rounded-full font-devanagari">
                   महत्त्वाची सूचना (Latest Announcement)
                 </span>
-                <span className="text-xs text-stone-500 font-medium">
+                <span className="text-xs text-stone-500 font-medium font-mono">
                   दिनांक: {latestAnnouncement.date}
                 </span>
               </div>
@@ -112,7 +103,7 @@ export default async function HomePage() {
                 {latestAnnouncement.contentMarathi}
               </p>
               {latestAnnouncement.venue && (
-                <div className="text-xs text-amber-900 font-semibold pt-1 flex items-center gap-1.5">
+                <div className="text-xs text-amber-900 font-semibold pt-1 flex items-center gap-1.5 font-devanagari">
                   <MapPin className="w-3.5 h-3.5 text-orange-600" />
                   <span>स्थान: {latestAnnouncement.venue}</span>
                 </div>
@@ -124,7 +115,7 @@ export default async function HomePage() {
 
       {/* MANDAL FEATURES & TRANSPARENCY CARDS */}
       <section className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <Card className="border-amber-200/80 hover:border-orange-300">
+        <Card className="border-amber-200/80 hover:border-orange-300 transition-colors shadow-sm">
           <CardContent className="p-6 space-y-3">
             <div className="w-12 h-12 rounded-xl bg-orange-100 text-orange-700 flex items-center justify-center">
               <FileCheck className="w-6 h-6" />
@@ -133,12 +124,12 @@ export default async function HomePage() {
               अधिकृत डिजिटल पावती (Digital Receipt)
             </h3>
             <p className="text-xs text-stone-600 leading-relaxed font-devanagari">
-              देणगी स्वीकारल्यानंतर तत्काळ अधिकृत अनुक्रमांकासह डिजिटल पावती तयार होते व WhatsApp वर थेट शेअर केली जाते.
+              देणगी स्वीकारल्यानंतर तत्काळ अधिकृत डिजिटल पावती तयार होते व WhatsApp वर थेट शेअर केली जाते.
             </p>
           </CardContent>
         </Card>
 
-        <Card className="border-amber-200/80 hover:border-orange-300">
+        <Card className="border-amber-200/80 hover:border-orange-300 transition-colors shadow-sm">
           <CardContent className="p-6 space-y-3">
             <div className="w-12 h-12 rounded-xl bg-amber-100 text-amber-800 flex items-center justify-center">
               <ShieldCheck className="w-6 h-6" />
@@ -152,7 +143,7 @@ export default async function HomePage() {
           </CardContent>
         </Card>
 
-        <Card className="border-amber-200/80 hover:border-orange-300">
+        <Card className="border-amber-200/80 hover:border-orange-300 transition-colors shadow-sm">
           <CardContent className="p-6 space-y-3">
             <div className="w-12 h-12 rounded-xl bg-emerald-100 text-emerald-800 flex items-center justify-center">
               <MessageCircle className="w-6 h-6" />
@@ -180,11 +171,11 @@ export default async function HomePage() {
               <MapPin className="w-5 h-5 text-orange-600" />
             </div>
             <div>
-              <span className="text-xs font-bold text-stone-500 uppercase tracking-wider block">
+              <span className="text-xs font-bold text-stone-500 uppercase tracking-wider block font-devanagari">
                 पत्ता व स्थान
               </span>
               <p className="text-sm font-semibold text-stone-900 font-devanagari mt-0.5">
-                {settings?.addressMarathi || settings?.locationMarathi || 'पुणे, महाराष्ट्र'}
+                {settings?.addressMarathi || 'तापडिया नगर अकोला 444001'}
               </p>
             </div>
           </div>
@@ -194,10 +185,10 @@ export default async function HomePage() {
               <Phone className="w-5 h-5 text-orange-600" />
             </div>
             <div>
-              <span className="text-xs font-bold text-stone-500 uppercase tracking-wider block">
+              <span className="text-xs font-bold text-stone-500 uppercase tracking-wider block font-devanagari">
                 संपर्क क्रमांक
               </span>
-              <p className="text-sm font-semibold text-stone-900 mt-0.5">
+              <p className="text-sm font-semibold text-stone-900 font-mono mt-0.5">
                 +91 {settings?.contactNumber || '9876543210'}
                 {settings?.alternateContact && <span> / +91 {settings.alternateContact}</span>}
               </p>
@@ -209,7 +200,7 @@ export default async function HomePage() {
               <Calendar className="w-5 h-5 text-orange-600" />
             </div>
             <div>
-              <span className="text-xs font-bold text-stone-500 uppercase tracking-wider block">
+              <span className="text-xs font-bold text-stone-500 uppercase tracking-wider block font-devanagari">
                 उत्सव वर्ष व नोंदणी
               </span>
               <p className="text-sm font-semibold text-stone-900 font-devanagari mt-0.5">

@@ -129,13 +129,33 @@ export class GoogleStorageProvider implements IStorageProvider {
     return this.fallbackProvider.savePayment(payment, mode);
   }
 
+  async updatePendingPayment(
+    paymentId: string,
+    data: {
+      donorName?: string;
+      donorMobile?: string;
+      donorAddress?: string;
+      expectedAmount?: number;
+      notes?: string;
+      date?: string;
+    },
+    mode: AppMode
+  ): Promise<Payment> {
+    return this.fallbackProvider.updatePendingPayment(paymentId, data, mode);
+  }
+
+  async cancelPendingPayment(paymentId: string, mode: AppMode): Promise<Payment> {
+    return this.fallbackProvider.cancelPendingPayment(paymentId, mode);
+  }
+
   async markPaymentAsPaid(
     paymentId: string,
     paymentDetails: {
       receivedAmount: number;
-      paymentMethod: 'CASH' | 'UPI' | 'OTHER';
+      paymentMethod: 'CASH' | 'UPI';
       transactionReference?: string;
       notes?: string;
+      paymentDate?: string;
       hostId: string;
       hostName: string;
     },
@@ -196,9 +216,17 @@ export class GoogleStorageProvider implements IStorageProvider {
     return this.fallbackProvider.getCollectionSummary(mode);
   }
 
-  // --- Test Mode Operations ---
+  async deleteOrArchiveDonor(donorId: string, mode: AppMode): Promise<{ success: boolean; action: 'DELETED' | 'ARCHIVED' }> {
+    return this.fallbackProvider.deleteOrArchiveDonor(donorId, mode);
+  }
+
+  // --- Data Reset & Test Operations ---
   async clearTestData(): Promise<{ deletedPayments: number; deletedDonors: number; deletedPavtis: number }> {
     return this.fallbackProvider.clearTestData();
+  }
+
+  async resetAllData(confirmation: string, mode: AppMode, user: any): Promise<boolean> {
+    return this.fallbackProvider.resetAllData(confirmation, mode, user);
   }
 
   // --- Backup & Restore ---

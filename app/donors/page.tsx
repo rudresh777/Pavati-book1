@@ -2,15 +2,18 @@
 
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { Users, Search, Phone, Eye, PlusCircle, ArrowRight, Wallet, FileText } from 'lucide-react';
+import { Users, Search, Phone, PlusCircle, ArrowRight, FileText } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { useAppMode } from '@/lib/context/mode-context';
+import { useLanguage } from '@/lib/context/language-context';
 import { Donor, MandalSettings } from '@/types';
 import { formatIndianCurrency } from '@/lib/utils/number-to-words';
 
 export default function DonorsPage() {
   const { mode } = useAppMode();
+  const { t } = useLanguage();
+
   const [donors, setDonors] = useState<Donor[]>([]);
   const [settings, setSettings] = useState<MandalSettings | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
@@ -40,6 +43,7 @@ export default function DonorsPage() {
   }, [mode]);
 
   const filteredDonors = donors.filter((d) => {
+    if (d.isArchived && !searchQuery) return false;
     const q = searchQuery.toLowerCase().trim();
     if (!q) return true;
     return (
@@ -56,17 +60,17 @@ export default function DonorsPage() {
         <div>
           <h1 className="text-xl sm:text-2xl font-black font-devanagari text-stone-900 flex items-center gap-2">
             <Users className="w-6 h-6 text-orange-600" />
-            <span>देणगीदार यादी (Donors Directory)</span>
+            <span>{t('donors.title')}</span>
           </h1>
           <p className="text-xs text-stone-500 font-devanagari">
-            मंडळातील सर्व देणगीदारांची नावे, मोबाईल आणि एकूण जमा वर्गणीचा इतिहास.
+            {t('donors.subtitle')}
           </p>
         </div>
 
         <Link href="/pavti/new">
           <Button variant="primary" size="sm" className="font-devanagari flex items-center gap-1.5 shadow">
             <PlusCircle className="w-4 h-4" />
-            <span>नवीन पावती फाडा</span>
+            <span>{t('donors.makePavti')}</span>
           </Button>
         </Link>
       </div>
@@ -78,7 +82,7 @@ export default function DonorsPage() {
           type="text"
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
-          placeholder="देणगीदाराचे नाव, मोबाईल किंवा पत्ता शोधा..."
+          placeholder={t('donors.searchPlaceholder')}
           className="w-full pl-10 pr-4 py-2.5 bg-white border border-stone-300 rounded-xl text-xs sm:text-sm text-stone-900 focus:outline-none focus:ring-2 focus:ring-orange-500 font-devanagari"
         />
       </div>
@@ -116,7 +120,7 @@ export default function DonorsPage() {
 
                   <div className="text-right">
                     <span className="text-[10px] font-bold uppercase text-stone-400 block font-devanagari">
-                      एकूण देणगी
+                      {t('donors.totalDonation')}
                     </span>
                     <span className="font-bold text-orange-800 font-mono text-base">
                       {formatIndianCurrency(d.totalContributed)}
@@ -127,10 +131,10 @@ export default function DonorsPage() {
                 <div className="flex items-center justify-between text-xs text-stone-500 font-devanagari">
                   <span className="flex items-center gap-1">
                     <FileText className="w-3.5 h-3.5 text-stone-400" />
-                    <span>{d.pavtiCount} पावत्या</span>
+                    <span>{d.pavtiCount} {t('donors.pavtisCount')}</span>
                   </span>
                   {d.lastPaymentDate && (
-                    <span>शेवटची पावती: {d.lastPaymentDate}</span>
+                    <span>{t('donors.lastPavti')} {d.lastPaymentDate}</span>
                   )}
                 </div>
 
@@ -145,7 +149,7 @@ export default function DonorsPage() {
                     href={`/donors/${d.id}`}
                     className="text-xs font-bold text-orange-600 hover:text-orange-700 font-devanagari flex items-center gap-1"
                   >
-                    <span>इतिहास पहा</span>
+                    <span>{t('donors.viewHistory')}</span>
                     <ArrowRight className="w-3.5 h-3.5" />
                   </Link>
 
@@ -153,7 +157,7 @@ export default function DonorsPage() {
                     href={`/pavti/new`}
                     className="text-xs font-semibold text-stone-600 hover:text-stone-900 bg-stone-50 hover:bg-stone-100 px-2.5 py-1 rounded-md border border-stone-200"
                   >
-                    + पावती फाडा
+                    {t('donors.makePavti')}
                   </Link>
                 </div>
               </CardContent>

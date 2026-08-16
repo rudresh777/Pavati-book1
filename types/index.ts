@@ -56,12 +56,13 @@ export interface Donor {
   lastPaymentDate?: string;
   mode: AppMode;
   notes?: string;
+  isArchived?: boolean;
   createdAt: string;
   updatedAt: string;
 }
 
-export type PaymentStatus = 'PENDING' | 'PARTIALLY_PAID' | 'PAID' | 'CANCELLED';
-export type PaymentMethod = 'CASH' | 'UPI' | 'OTHER';
+export type PaymentStatus = 'DUE' | 'PAID' | 'CANCELLED' | 'PENDING' | 'PARTIALLY_PAID';
+export type PaymentMethod = 'CASH' | 'UPI';
 
 export interface Payment {
   id: string;
@@ -88,20 +89,23 @@ export interface Payment {
 
 export interface Pavti {
   id: string;
-  receiptNumber: string;
+  receiptNumber: string; // Empty string or "DUE" when unpaid, formatted "000001" when PAID
+  numericReceiptNumber?: number;
   paymentId: string;
   donorId: string;
   donorName: string;
   donorMobile: string;
+  donorAddress?: string;
   amount: number;
   amountInWordsMarathi: string;
   amountInWordsEnglish: string;
   paymentMethod: PaymentMethod;
+  status?: PaymentStatus; // 'DUE' or 'PAID'
   transactionReference?: string;
   date: string;
   hostName: string;
   mode: AppMode;
-  imageFileId?: string; // Storage reference if backed up to Drive
+  imageFileId?: string;
   generatedAt: string;
 }
 
@@ -112,7 +116,9 @@ export interface Announcement {
   contentMarathi: string;
   contentEnglish?: string;
   date: string;
+  time?: string;
   active: boolean;
+  status: 'DRAFT' | 'PUBLISHED' | 'UNPUBLISHED' | 'ARCHIVED';
   priority: 'NORMAL' | 'HIGH' | 'URGENT';
   eventDate?: string;
   venue?: string;
@@ -142,8 +148,8 @@ export interface CollectionSummary {
   thisMonthCollection: number;
   currentYearCollection: number;
   paidPavtisCount: number;
-  pendingAmount: number;
-  pendingDonorsCount: number;
+  pendingAmount: number; // Sum of active DUE / PENDING
+  pendingDonorsCount: number; // Count of active DUE / PENDING
   partiallyPaidAmount: number;
   cashCollection: number;
   upiCollection: number;

@@ -6,17 +6,14 @@ import {
   CreditCard,
   Search,
   Download,
-  Filter,
   Eye,
   Share2,
   PlusCircle,
-  Clock,
-  CheckCircle,
 } from 'lucide-react';
-import { Card, CardContent } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { useAppMode } from '@/lib/context/mode-context';
+import { useLanguage } from '@/lib/context/language-context';
 import { Payment, Pavti, MandalSettings } from '@/types';
 import { formatIndianCurrency } from '@/lib/utils/number-to-words';
 import { PavtiCard } from '@/components/pavti/PavtiCard';
@@ -24,6 +21,7 @@ import { PavtiShareModal } from '@/components/pavti/PavtiShareModal';
 
 export default function PaymentsLedgerPage() {
   const { mode } = useAppMode();
+  const { t } = useLanguage();
 
   const [payments, setPayments] = useState<Payment[]>([]);
   const [settings, setSettings] = useState<MandalSettings | null>(null);
@@ -92,7 +90,7 @@ export default function PaymentsLedgerPage() {
   // Calculate totals for currently filtered list
   const totalPaidFiltered = filteredPayments
     .filter((p) => p.status === 'PAID')
-    .reduce((sum, p) => sum + p.receivedAmount, 0);
+    .reduce((sum, p) => sum + (p.receivedAmount || 0), 0);
 
   // Export filtered ledger to CSV
   const handleExportCSV = () => {
@@ -115,12 +113,12 @@ export default function PaymentsLedgerPage() {
       p.date,
       `"${p.donorName.replace(/"/g, '""')}"`,
       p.donorMobile || '',
-      p.receivedAmount,
-      p.expectedAmount,
+      p.receivedAmount || 0,
+      p.expectedAmount || 0,
       p.status,
       p.paymentMethod,
       p.transactionReference || '',
-      `"${p.hostName.replace(/"/g, '""')}"`,
+      `"${(p.hostName || '').replace(/"/g, '""')}"`,
       `"${(p.notes || '').replace(/"/g, '""')}"`,
     ]);
 
@@ -147,10 +145,10 @@ export default function PaymentsLedgerPage() {
         <div>
           <h1 className="text-xl sm:text-2xl font-black font-devanagari text-stone-900 flex items-center gap-2">
             <CreditCard className="w-6 h-6 text-orange-600" />
-            <span>जमा नोंदी व लेजर (Collections Ledger)</span>
+            <span>{t('ledger.title')}</span>
           </h1>
           <p className="text-xs text-stone-500 font-devanagari">
-            सर्व अधिकृत पावत्या व बाकी नोंदींचा संपूर्ण हिशोब.
+            {t('ledger.subtitle')}
           </p>
         </div>
 
@@ -162,13 +160,13 @@ export default function PaymentsLedgerPage() {
             className="font-devanagari flex items-center gap-1.5"
           >
             <Download className="w-4 h-4" />
-            <span>CSV एक्सपोर्ट करा</span>
+            <span>{t('ledger.exportCsv')}</span>
           </Button>
 
           <Link href="/pavti/new">
             <Button variant="primary" size="sm" className="font-devanagari flex items-center gap-1.5 shadow">
               <PlusCircle className="w-4 h-4" />
-              <span>नवीन पावती</span>
+              <span>{t('ledger.newPavti')}</span>
             </Button>
           </Link>
         </div>
@@ -184,7 +182,7 @@ export default function PaymentsLedgerPage() {
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="पावती क्र., नाव, मोबाईल किंवा UTR..."
+              placeholder={t('ledger.searchPlaceholder')}
               className="w-full pl-9 pr-3 py-2 bg-stone-50 border border-stone-300 rounded-lg text-xs text-stone-900 font-devanagari focus:outline-none focus:ring-2 focus:ring-orange-500"
             />
           </div>
@@ -196,24 +194,23 @@ export default function PaymentsLedgerPage() {
               onChange={(e) => setStatusFilter(e.target.value)}
               className="w-full px-3 py-2 bg-stone-50 border border-stone-300 rounded-lg text-xs text-stone-800 font-devanagari focus:outline-none focus:ring-2 focus:ring-orange-500"
             >
-              <option value="ALL">सर्व स्थिती (All Status)</option>
-              <option value="PAID">फक्त जमा (Paid Only)</option>
-              <option value="PENDING">फक्त बाकी (Pending Only)</option>
-              <option value="PARTIALLY_PAID">अंशतः जमा (Partially Paid)</option>
-              <option value="CANCELLED">रद्द (Cancelled)</option>
+              <option value="ALL">{t('ledger.allStatus')}</option>
+              <option value="PAID">{t('ledger.paidOnly')}</option>
+              <option value="PENDING">{t('ledger.pendingOnly')}</option>
+              <option value="CANCELLED">{t('ledger.cancelledOnly')}</option>
             </select>
           </div>
 
-          {/* Method Filter */}
+          {/* Method Filter (Strictly Cash and UPI) */}
           <div>
             <select
               value={methodFilter}
               onChange={(e) => setMethodFilter(e.target.value)}
               className="w-full px-3 py-2 bg-stone-50 border border-stone-300 rounded-lg text-xs text-stone-800 font-devanagari focus:outline-none focus:ring-2 focus:ring-orange-500"
             >
-              <option value="ALL">सर्व माध्यम (Cash & UPI)</option>
-              <option value="CASH">फक्त रोख (Cash Only)</option>
-              <option value="UPI">फक्त UPI / Online</option>
+              <option value="ALL">{t('ledger.allMethods')}</option>
+              <option value="CASH">{t('ledger.cashOnly')}</option>
+              <option value="UPI">{t('ledger.upiOnly')}</option>
             </select>
           </div>
         </div>
@@ -221,10 +218,10 @@ export default function PaymentsLedgerPage() {
         {/* Quick Summary Strip */}
         <div className="flex flex-wrap items-center justify-between text-xs text-stone-600 pt-2 border-t border-stone-100 font-devanagari">
           <span>
-            एकूण नोंदी: <strong>{filteredPayments.length}</strong>
+            {t('ledger.totalRecords')} <strong>{filteredPayments.length}</strong>
           </span>
           <span>
-            फिल्टर केलेली जमा रक्कम: <strong className="text-orange-800 font-mono">{formatIndianCurrency(totalPaidFiltered)}</strong>
+            {t('ledger.filteredTotal')} <strong className="text-orange-800 font-mono">{formatIndianCurrency(totalPaidFiltered)}</strong>
           </span>
         </div>
       </div>
@@ -275,23 +272,19 @@ export default function PaymentsLedgerPage() {
                             ? 'success'
                             : p.status === 'PENDING'
                             ? 'warning'
-                            : p.status === 'PARTIALLY_PAID'
-                            ? 'info'
                             : 'danger'
                         }
                       >
                         {p.status === 'PAID'
-                          ? 'जमा'
+                          ? t('common.status.paid')
                           : p.status === 'PENDING'
-                          ? 'बाकी'
-                          : p.status === 'PARTIALLY_PAID'
-                          ? 'अंशतः'
-                          : 'रद्द'}
+                          ? t('common.status.pending')
+                          : t('common.status.cancelled')}
                       </Badge>
                     </td>
                     <td className="px-4 py-3">
                       <div className="font-devanagari font-semibold text-stone-800">
-                        {p.paymentMethod === 'CASH' ? 'रोख' : 'UPI'}
+                        {p.paymentMethod === 'CASH' ? t('dashboard.cash') : 'UPI'}
                       </div>
                       {p.transactionReference && (
                         <div className="text-[10px] text-stone-400 font-mono">
@@ -321,7 +314,7 @@ export default function PaymentsLedgerPage() {
                       ) : p.status === 'PENDING' ? (
                         <Link href="/pending">
                           <span className="text-[11px] font-bold text-orange-600 hover:underline font-devanagari">
-                            जमा करा →
+                            {t('dashboard.collectNow')}
                           </span>
                         </Link>
                       ) : null}

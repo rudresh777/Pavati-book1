@@ -8,6 +8,7 @@ import {
   AuditLog,
   AppMode,
   CollectionSummary,
+  UserRole,
 } from '@/types';
 
 export interface DatabaseBackup {
@@ -52,6 +53,7 @@ export interface IStorageProvider {
   getDonorById(id: string, mode: AppMode): Promise<Donor | null>;
   getDonorByMobile(mobile: string, mode: AppMode): Promise<Donor | null>;
   saveDonor(donor: Donor, mode: AppMode): Promise<Donor>;
+  deleteOrArchiveDonor(donorId: string, mode: AppMode): Promise<{ success: boolean; action: 'DELETED' | 'ARCHIVED' }>;
   searchDonors(query: string, mode: AppMode): Promise<Donor[]>;
 
   // Payments
@@ -60,14 +62,28 @@ export interface IStorageProvider {
   getPaymentsByDonorId(donorId: string, mode: AppMode): Promise<Payment[]>;
   getPendingPayments(mode: AppMode): Promise<Payment[]>;
   savePayment(payment: Payment, mode: AppMode): Promise<Payment>;
+  updatePendingPayment(
+    paymentId: string,
+    data: {
+      donorName?: string;
+      donorMobile?: string;
+      donorAddress?: string;
+      expectedAmount?: number;
+      notes?: string;
+      date?: string;
+    },
+    mode: AppMode
+  ): Promise<Payment>;
+  cancelPendingPayment(paymentId: string, mode: AppMode): Promise<Payment>;
   getNextReceiptNumber(mode: AppMode): Promise<{ formatted: string; numeric: number }>;
   markPaymentAsPaid(
     paymentId: string,
     paymentDetails: {
       receivedAmount: number;
-      paymentMethod: 'CASH' | 'UPI' | 'OTHER';
+      paymentMethod: 'CASH' | 'UPI';
       transactionReference?: string;
       notes?: string;
+      paymentDate?: string;
       hostId: string;
       hostName: string;
     },
@@ -94,8 +110,9 @@ export interface IStorageProvider {
   // Analytics
   getCollectionSummary(mode: AppMode): Promise<CollectionSummary>;
 
-  // Test Mode Operations
+  // Data Reset & Test Operations
   clearTestData(): Promise<{ deletedPayments: number; deletedDonors: number; deletedPavtis: number }>;
+  resetAllData(confirmation: string, mode: AppMode, user: { userId: string; userName: string; userRole: UserRole }): Promise<boolean>;
 
   // Backup & Restore
   exportBackup(): Promise<DatabaseBackup>;

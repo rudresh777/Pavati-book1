@@ -16,11 +16,37 @@ export async function GET(request: Request) {
     const storage = getStorageProvider();
     await storage.init();
 
-    const summary = await storage.getCollectionSummary(mode);
-    const recentPayments = (await storage.getPayments(mode)).slice(0, 8);
+    const fullSummary = await storage.getCollectionSummary(mode);
+    const isSuperAdmin = session.role === 'SUPER_ADMIN';
+
+    // STRICT SERVER-SIDE PRIVACY ENFORCEMENT:
+    // Only SUPER_ADMIN receives total collections, today's collection, and payment mode breakdowns.
+    // HOST receives only operational metrics (pending amount, pending count, paid count).
+    const summary = isSuperAdmin
+      ? fullSummary
+      : {
+          pendingAmount: fullSummary.pendingAmount,
+          pendingDonorsCount: fullSummary.pendingDonorsCount,
+          paidPavtisCount: fullSummary.paidPavtisCount,
+          mode: fullSummary.mode,
+          // Explicitly omit / nullify financial totals
+          totalCollection: null,
+          todayCollection: null,
+          yesterdayCollection: null,
+          thisWeekCollection: null,
+          thisMonthCollection: null,
+          currentYearCollection: null,
+          cashCollection: null,
+          upiCollection: null,
+          otherCollection: null,
+        };
+
+    const allPayments = await storage.getPayments(mode);
+    const recentPayments = allPayments.slice(0, 8);
     const pendingPayments = (await storage.getPendingPayments(mode)).slice(0, 5);
 
     return NextResponse.json({
+      role: session.role,
       summary,
       recentPayments,
       pendingPayments,

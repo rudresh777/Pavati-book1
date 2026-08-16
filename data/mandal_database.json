@@ -22,6 +22,17 @@
         "lastPaymentDate": "2026-08-15",
         "createdAt": "2026-08-15T11:30:00.000Z",
         "updatedAt": "2026-08-15T11:30:00.000Z"
+      },
+      {
+        "id": "donor-1786906643426-a2s2",
+        "name": "om",
+        "mobile": "3333333333",
+        "address": "Tapadiya nagar Mohan bhaji bhandar Akola 444001",
+        "totalContributed": 0,
+        "pavtiCount": 0,
+        "mode": "LIVE",
+        "createdAt": "2026-08-16T18:57:23.426Z",
+        "updatedAt": "2026-08-16T18:57:23.459Z"
       }
     ],
     "payments": [
@@ -61,6 +72,26 @@
         "date": "15/08/2026",
         "timestamp": "2026-08-15T11:30:00.000Z",
         "mode": "LIVE"
+      },
+      {
+        "id": "pay-1786906643435-e5zb",
+        "donorId": "donor-1786906643426-a2s2",
+        "donorName": "om",
+        "donorMobile": "3333333333",
+        "donorAddress": "Tapadiya nagar Mohan bhaji bhandar Akola 444001",
+        "expectedAmount": 501,
+        "receivedAmount": 0,
+        "remainingAmount": 501,
+        "status": "PENDING",
+        "paymentMethod": "UPI",
+        "transactionReference": "",
+        "date": "2026-08-16",
+        "hostId": "admin-1",
+        "hostName": "सुपर ॲडमिन (Super Admin)",
+        "notes": "",
+        "mode": "LIVE",
+        "createdAt": "2026-08-16T18:57:23.435Z",
+        "updatedAt": "2026-08-16T18:57:23.459Z"
       }
     ],
     "pavtis": [
@@ -155,14 +186,74 @@
         "mode": "LIVE",
         "id": "audit-1786873828065-648t",
         "timestamp": "2026-08-16T09:50:28.065Z"
+      },
+      {
+        "userId": "admin-1",
+        "userName": "सुपर ॲडमिन (Super Admin)",
+        "userRole": "SUPER_ADMIN",
+        "action": "USER_LOGIN",
+        "entityType": "USER",
+        "entityId": "admin-1",
+        "details": "SUPER_ADMIN (सुपर ॲडमिन (Super Admin)) logged in successfully.",
+        "mode": "LIVE",
+        "id": "audit-1786903454551-6e3i",
+        "timestamp": "2026-08-16T18:04:14.552Z"
+      },
+      {
+        "userId": "admin-1",
+        "userName": "सुपर ॲडमिन (Super Admin)",
+        "userRole": "SUPER_ADMIN",
+        "action": "USER_LOGIN",
+        "entityType": "USER",
+        "entityId": "admin-1",
+        "details": "SUPER_ADMIN (सुपर ॲडमिन (Super Admin)) logged in successfully.",
+        "mode": "LIVE",
+        "id": "audit-1786904465351-9d88",
+        "timestamp": "2026-08-16T18:21:05.351Z"
+      },
+      {
+        "userId": "admin-1",
+        "userName": "सुपर ॲडमिन (Super Admin)",
+        "userRole": "SUPER_ADMIN",
+        "action": "PENDING_DONOR_ADDED",
+        "entityType": "PAYMENT",
+        "entityId": "pay-1786906643435-e5zb",
+        "details": "Added pending collection record for om (Expected: ₹501).",
+        "mode": "LIVE",
+        "id": "audit-1786906643482-qpe1",
+        "timestamp": "2026-08-16T18:57:23.482Z"
+      },
+      {
+        "userId": "admin-1",
+        "userName": "सुपर ॲडमिन (Super Admin)",
+        "userRole": "SUPER_ADMIN",
+        "action": "USER_LOGIN",
+        "entityType": "USER",
+        "entityId": "admin-1",
+        "details": "SUPER_ADMIN (सुपर ॲडमिन (Super Admin)) logged in successfully.",
+        "mode": "LIVE",
+        "id": "audit-1786908584319-6sxb",
+        "timestamp": "2026-08-16T19:29:44.319Z"
+      },
+      {
+        "userId": "admin-1",
+        "userName": "सुपर ॲडमिन (Super Admin)",
+        "userRole": "SUPER_ADMIN",
+        "action": "USER_LOGIN",
+        "entityType": "USER",
+        "entityId": "admin-1",
+        "details": "SUPER_ADMIN (सुपर ॲडमिन (Super Admin)) logged in successfully.",
+        "mode": "LIVE",
+        "id": "audit-1786909180311-557s",
+        "timestamp": "2026-08-16T19:39:40.311Z"
       }
     ]
   },
   "testData": {
+    "receiptCounter": 0,
     "donors": [],
     "payments": [],
     "pavtis": [],
-    "lastReceiptNumber": 0,
     "auditLogs": []
   },
   "settings": {
@@ -172,8 +263,8 @@
     "year": "२०२६",
     "taglineMarathi": "॥ श्री गणेशाय नमः ॥",
     "sloganMarathi": "॥ गणपती बाप्पा मोरया ॥",
-    "addressMarathi": "लक्ष्मी रोड, गणपती चौक, पुणे - ४११००२",
-    "locationMarathi": "पुणे, महाराष्ट्र",
+    "addressMarathi": "तापडिया नगर अकोला 444001",
+    "locationMarathi": "अकोला, महाराष्ट्र",
     "contactNumber": "9822012345",
     "alternateContact": "9890123456",
     "whatsappGroupLink": "https://chat.whatsapp.com/GaneshMandal2026",

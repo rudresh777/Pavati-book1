@@ -2,21 +2,25 @@
 
 import React, { useEffect, useState } from 'react';
 import {
-  Sliders,
   Save,
   Plus,
   Trash2,
   CheckCircle,
   AlertCircle,
   Building,
+  Languages,
   ToggleLeft,
   ToggleRight,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
+import { useLanguage } from '@/lib/context/language-context';
 import { MandalSettings, MandalDesignation } from '@/types';
+import { cn } from '@/lib/utils/cn';
 
 export default function MandalSettingsPage() {
+  const { language, setLanguage, t } = useLanguage();
+
   const [settings, setSettings] = useState<MandalSettings | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
@@ -99,7 +103,7 @@ export default function MandalSettingsPage() {
   if (isLoading || !settings) {
     return (
       <div className="text-center py-20 font-devanagari text-stone-600">
-        सेटिंग्ज लोड होत आहेत...
+        {t('common.loading')}
       </div>
     );
   }
@@ -111,10 +115,10 @@ export default function MandalSettingsPage() {
         <div>
           <h1 className="text-xl sm:text-2xl font-black font-devanagari text-stone-900 flex items-center gap-2">
             <Building className="w-6 h-6 text-orange-600" />
-            <span>मंडळ व पावती सेटिंग्ज (Mandal Settings)</span>
+            <span>{t('settings.title')}</span>
           </h1>
           <p className="text-xs text-stone-500 font-devanagari">
-            मंडळाचे नाव, पत्ता, संपर्क, पावतीचे स्वरूप आणि पदाधिकाऱ्यांची माहिती येथे बदला.
+            {t('settings.subtitle')}
           </p>
         </div>
 
@@ -125,7 +129,7 @@ export default function MandalSettingsPage() {
           className="font-devanagari font-bold py-2.5 px-6 shadow flex items-center gap-2"
         >
           <Save className="w-4 h-4" />
-          <span>बदल सेव्ह करा</span>
+          <span>{t('settings.saveChanges')}</span>
         </Button>
       </div>
 
@@ -142,6 +146,47 @@ export default function MandalSettingsPage() {
           <span>{error}</span>
         </div>
       )}
+
+      {/* LANGUAGE PREFERENCE SETTING */}
+      <Card className="border-amber-300 bg-gradient-to-r from-amber-50/70 to-orange-50/50 shadow-sm">
+        <CardHeader className="pb-3">
+          <CardTitle className="text-sm font-bold text-amber-950 font-devanagari flex items-center gap-2">
+            <Languages className="w-4 h-4 text-orange-600" />
+            <span>{t('settings.languageSetting')}</span>
+          </CardTitle>
+          <CardDescription className="text-xs text-stone-600">
+            {t('settings.languageDesc')}
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="p-6 pt-0">
+          <div className="flex flex-wrap items-center gap-3">
+            <button
+              type="button"
+              onClick={() => setLanguage('mr')}
+              className={cn(
+                'px-5 py-2.5 rounded-xl border-2 font-bold text-xs sm:text-sm font-devanagari transition-all shadow-sm',
+                language === 'mr'
+                  ? 'bg-orange-600 text-white border-orange-600'
+                  : 'bg-white text-stone-700 border-stone-200 hover:border-orange-300'
+              )}
+            >
+              🚩 मराठी (Marathi)
+            </button>
+            <button
+              type="button"
+              onClick={() => setLanguage('en')}
+              className={cn(
+                'px-5 py-2.5 rounded-xl border-2 font-bold text-xs sm:text-sm font-sans transition-all shadow-sm',
+                language === 'en'
+                  ? 'bg-orange-600 text-white border-orange-600'
+                  : 'bg-white text-stone-700 border-stone-200 hover:border-orange-300'
+              )}
+            >
+              🌐 English (इंग्रजी)
+            </button>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* 1. BASIC MANDAL DETAILS */}
       <Card className="border-amber-200 shadow-sm">
@@ -191,7 +236,7 @@ export default function MandalSettingsPage() {
                 type="text"
                 value={settings.year}
                 onChange={(e) => setSettings({ ...settings, year: e.target.value })}
-                placeholder="२०२६-२०२७"
+                placeholder="२०२६"
                 className="w-full px-3.5 py-2.5 bg-white border border-stone-300 rounded-lg text-sm text-stone-900 font-devanagari focus:ring-2 focus:ring-orange-500"
               />
             </div>
@@ -219,7 +264,7 @@ export default function MandalSettingsPage() {
                 onChange={(e) =>
                   setSettings({ ...settings, locationMarathi: e.target.value })
                 }
-                placeholder="पुणे, महाराष्ट्र"
+                placeholder="अकोला, महाराष्ट्र"
                 className="w-full px-3.5 py-2.5 bg-white border border-stone-300 rounded-lg text-sm text-stone-900 font-devanagari focus:ring-2 focus:ring-orange-500"
               />
             </div>
@@ -235,7 +280,7 @@ export default function MandalSettingsPage() {
               onChange={(e) =>
                 setSettings({ ...settings, addressMarathi: e.target.value })
               }
-              placeholder="उदा. लक्ष्मी रोड, गणपती चौक, पुणे - ४११००२"
+              placeholder="उदा. तापडिया नगर अकोला 444001"
               className="w-full px-3.5 py-2.5 bg-white border border-stone-300 rounded-lg text-sm text-stone-900 font-devanagari focus:ring-2 focus:ring-orange-500"
             />
           </div>
@@ -293,9 +338,6 @@ export default function MandalSettingsPage() {
               placeholder="https://chat.whatsapp.com/..."
               className="w-full px-3.5 py-2.5 bg-white border border-stone-300 rounded-lg text-sm text-stone-900 font-mono focus:ring-2 focus:ring-orange-500"
             />
-            <p className="text-[11px] text-stone-500 font-devanagari">
-              पावती शेअर करताना देणगीदाराला या ग्रुपमध्ये सामील होण्यासाठी आमंत्रण लिंक दिली जाईल.
-            </p>
           </div>
         </CardContent>
       </Card>
@@ -331,7 +373,6 @@ export default function MandalSettingsPage() {
               className="p-3.5 bg-stone-50 rounded-xl border border-stone-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3"
             >
               <div className="flex items-center gap-3 flex-1">
-                {/* ON/OFF TOGGLE */}
                 <button
                   type="button"
                   onClick={() => handleToggleDesignation(desig.id)}
@@ -429,9 +470,6 @@ export default function MandalSettingsPage() {
                 }
                 className="w-full px-3.5 py-2.5 bg-white border border-stone-300 rounded-lg text-sm text-stone-900 font-mono focus:ring-2 focus:ring-orange-500"
               />
-              <p className="text-[11px] text-stone-500">
-                उदा. 1 $\rightarrow$ 000001, 101 $\rightarrow$ 000101
-              </p>
             </div>
           </div>
         </CardContent>
@@ -446,7 +484,7 @@ export default function MandalSettingsPage() {
           className="font-devanagari font-bold py-3 px-8 shadow-lg text-base"
         >
           <Save className="w-5 h-5 mr-2" />
-          <span>सर्व बदल सेव्ह करा (Save All Changes)</span>
+          <span>{t('settings.saveChanges')}</span>
         </Button>
       </div>
     </form>

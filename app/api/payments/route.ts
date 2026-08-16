@@ -23,7 +23,11 @@ export async function GET(request: Request) {
     let payments = await storage.getPayments(mode);
 
     if (status) {
-      payments = payments.filter((p) => p.status === status);
+      if (status === 'PENDING' || status === 'DUE') {
+        payments = payments.filter((p) => p.status === 'PENDING' || p.status === 'DUE');
+      } else {
+        payments = payments.filter((p) => p.status === status);
+      }
     }
     if (paymentMethod) {
       payments = payments.filter((p) => p.paymentMethod === paymentMethod);
@@ -70,6 +74,9 @@ export async function POST(request: Request) {
     if (status === 'PAID' && numAmount <= 0) {
       return NextResponse.json({ error: 'पावतीसाठी रक्कम ₹१ पेक्षा जास्त असावी.' }, { status: 400 });
     }
+    if ((status === 'DUE' || status === 'PENDING') && numExpected <= 0) {
+      return NextResponse.json({ error: 'बाकी पावतीसाठी अपेक्षित रक्कम ₹१ पेक्षा जास्त असावी.' }, { status: 400 });
+    }
 
     const storage = getStorageProvider();
     await storage.init();
@@ -107,7 +114,7 @@ export async function POST(request: Request) {
 
     // 2. Handle PAID payment
     if (status === 'PAID') {
-      // Assign transaction-safe receipt number
+      // Assign atomic official receipt number
       const { formatted: formattedReceiptNumber, numeric: nextNumber } =
         await storage.getNextReceiptNumber(mode as AppMode);
 
@@ -140,14 +147,17 @@ export async function POST(request: Request) {
       const pavti: Pavti = {
         id: `pavti-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
         receiptNumber: formattedReceiptNumber,
+        numericReceiptNumber: nextNumber,
         paymentId: payment.id,
         donorId: finalDonorId,
         donorName: donorName.trim(),
         donorMobile: donorMobile?.trim() || '',
+        donorAddress: donorAddress?.trim() || '',
         amount: numAmount,
         amountInWordsMarathi: numberToWordsMarathi(numAmount),
         amountInWordsEnglish: numberToWordsEnglish(numAmount),
         paymentMethod: paymentMethod as PaymentMethod,
+        status: 'PAID',
         transactionReference: transactionReference?.trim() || '',
         date: today,
         hostName: session.name,
@@ -176,20 +186,20 @@ export async function POST(request: Request) {
       });
     }
 
-    // 3. Handle PENDING or PARTIALLY_PAID payment
-    // IMPORTANT: Pending payments do NOT consume a receipt number or add to collection
-    const pendingPayment: Payment = {
+    // 3. Handle DUE (or PENDING) payment
+    // IMPORTANT: Due payments do NOT consume an official receipt number or add to collection
+    const duePayment: Payment = {
       id: paymentId,
-      receiptNumber: undefined, // No receipt number for pending!
+      receiptNumber: undefined,
       numericReceiptNumber: undefined,
       donorId: finalDonorId,
       donorName: donorName.trim(),
       donorMobile: donorMobile?.trim() || '',
       donorAddress: donorAddress?.trim() || '',
       expectedAmount: numExpected,
-      receivedAmount: numAmount,
-      remainingAmount: numExpected - numAmount,
-      status: (status === 'PARTIALLY_PAID' ? 'PARTIALLY_PAID' : 'PENDING') as PaymentStatus,
+      receivedAmount: 0,
+      remainingAmount: numExpected,
+      status: 'DUE',
       paymentMethod: paymentMethod as PaymentMethod,
       transactionReference: transactionReference?.trim() || '',
       date: today,
@@ -201,22 +211,46 @@ export async function POST(request: Request) {
       updatedAt: new Date().toISOString(),
     };
 
-    await storage.savePayment(pendingPayment, mode as AppMode);
+    await storage.savePayment(duePayment, mode as AppMode);
+
+    // Create Due Pavti Record (Same design, status DUE, no numeric receipt number)
+    const duePavti: Pavti = {
+      id: `pavti-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+      receiptNumber: '',
+      paymentId: duePayment.id,
+      donorId: finalDonorId,
+      donorName: donorName.trim(),
+      donorMobile: donorMobile?.trim() || '',
+      donorAddress: donorAddress?.trim() || '',
+      amount: numExpected,
+      amountInWordsMarathi: numberToWordsMarathi(numExpected),
+      amountInWordsEnglish: numberToWordsEnglish(numExpected),
+      paymentMethod: paymentMethod as PaymentMethod,
+      status: 'DUE',
+      transactionReference: transactionReference?.trim() || '',
+      date: today,
+      hostName: session.name,
+      mode: mode as AppMode,
+      generatedAt: new Date().toISOString(),
+    };
+
+    await storage.savePavti(duePavti, mode as AppMode);
 
     await storage.addAuditLog({
       userId: session.userId,
       userName: session.name,
       userRole: session.role,
-      action: 'PENDING_DONOR_ADDED',
+      action: 'DUE_PAVTI_CREATED',
       entityType: 'PAYMENT',
-      entityId: pendingPayment.id,
-      details: `Added pending collection record for ${donorName} (Expected: ₹${numExpected}).`,
+      entityId: duePayment.id,
+      details: `Generated Due Pavti (बाकी) for ${donorName} (₹${numExpected}).`,
       mode: mode as AppMode,
     });
 
     return NextResponse.json({
       success: true,
-      payment: pendingPayment,
+      payment: duePayment,
+      pavti: duePavti,
     });
   } catch (error: any) {
     console.error('Payment creation error:', error);

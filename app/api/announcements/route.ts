@@ -6,12 +6,20 @@ import { Announcement } from '@/types';
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
-    const onlyActive = searchParams.get('active') === 'true';
+    const onlyActive = searchParams.get('active') === 'true' || searchParams.get('public') === 'true';
 
     const storage = getStorageProvider();
     await storage.init();
 
-    const announcements = await storage.getAnnouncements(onlyActive);
+    let announcements = await storage.getAnnouncements(false);
+
+    if (onlyActive) {
+      // Only PUBLISHED announcements appear publicly
+      announcements = announcements.filter(
+        (a) => a.status === 'PUBLISHED' || (a.status === undefined && a.active)
+      );
+    }
+
     return NextResponse.json({ announcements });
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });
@@ -21,8 +29,8 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   try {
     const session = await getSession();
-    if (!session || session.role !== 'SUPER_ADMIN') {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
+    if (!session) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     const body = await request.json();
@@ -33,7 +41,8 @@ export async function POST(request: Request) {
       contentMarathi,
       contentEnglish,
       date,
-      active = true,
+      time,
+      status = 'PUBLISHED',
       priority = 'NORMAL',
       eventDate,
       venue,
@@ -49,6 +58,8 @@ export async function POST(request: Request) {
     const storage = getStorageProvider();
     await storage.init();
 
+    const isPublished = status === 'PUBLISHED';
+
     const announcement: Announcement = {
       id: id || `ann-${Date.now()}`,
       titleMarathi: titleMarathi.trim(),
@@ -56,7 +67,9 @@ export async function POST(request: Request) {
       contentMarathi: contentMarathi.trim(),
       contentEnglish: contentEnglish?.trim() || '',
       date: date || new Date().toISOString().split('T')[0],
-      active,
+      time: time?.trim() || undefined,
+      active: isPublished,
+      status: status as any,
       priority,
       eventDate: eventDate || undefined,
       venue: venue?.trim() || undefined,
@@ -73,7 +86,7 @@ export async function POST(request: Request) {
       action: id ? 'ANNOUNCEMENT_UPDATED' : 'ANNOUNCEMENT_CREATED',
       entityType: 'ANNOUNCEMENT',
       entityId: saved.id,
-      details: `Announcement "${saved.titleMarathi}" ${id ? 'updated' : 'published'}.`,
+      details: `Announcement "${saved.titleMarathi}" status set to ${status} by ${session.name}.`,
       mode: 'LIVE',
     });
 
@@ -86,8 +99,8 @@ export async function POST(request: Request) {
 export async function DELETE(request: Request) {
   try {
     const session = await getSession();
-    if (!session || session.role !== 'SUPER_ADMIN') {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
+    if (!session) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     const { searchParams } = new URL(request.url);

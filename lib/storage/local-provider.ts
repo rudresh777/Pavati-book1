@@ -11,6 +11,7 @@ import {
   AuditLog,
   AppMode,
   CollectionSummary,
+  UserRole,
 } from '@/types';
 import { IStorageProvider, DatabaseBackup } from './types';
 import { numberToWordsMarathi, numberToWordsEnglish } from '@/lib/utils/number-to-words';
@@ -40,15 +41,15 @@ const DEFAULT_SETTINGS: MandalSettings = {
   id: 'mandal-settings-default',
   mandalNameMarathi: 'मोरया गणेशोत्सव मंडळ',
   mandalNameEnglish: 'Morya Ganeshotsav Mandal',
-  regNumber: 'महा/१२३/२०२६/पुणे',
-  locationMarathi: 'पुणे, महाराष्ट्र',
-  locationEnglish: 'Pune, Maharashtra',
-  addressMarathi: 'लक्ष्मी रोड, गणपती चौक, पुणे - ४११००२',
-  addressEnglish: 'Laxmi Road, Ganpati Chowk, Pune - 411002',
+  regNumber: 'महा/१२३/२०२६/अकोला',
+  locationMarathi: 'अकोला, महाराष्ट्र',
+  locationEnglish: 'Akola, Maharashtra',
+  addressMarathi: 'तापडिया नगर अकोला 444001',
+  addressEnglish: 'Tapadia Nagar Akola 444001',
   contactNumber: '9876543210',
   alternateContact: '9123456789',
   whatsappGroupLink: 'https://chat.whatsapp.com/sample-ganesh-mandal-group',
-  year: '२०२६-२०२७',
+  year: '२०२६',
   taglineMarathi: '॥ श्री गणेशाय नमः ॥',
   sloganMarathi: '॥ गणपती बाप्पा मोरया ॥',
   receiptPrefix: '',
@@ -142,6 +143,7 @@ export class LocalStorageProvider implements IStorageProvider {
               'All devotees are requested to deposit their contribution/donation for this year Ganeshotsav with the authorized Mandal representatives and obtain a digital receipt.',
             date: new Date().toISOString().split('T')[0],
             active: true,
+            status: 'PUBLISHED',
             priority: 'HIGH',
             createdAt: new Date().toISOString(),
             updatedAt: new Date().toISOString(),
@@ -335,8 +337,35 @@ export class LocalStorageProvider implements IStorageProvider {
     const db = await this.readDb();
     const scope = mode === 'LIVE' ? db.liveData : db.testData;
     return scope.payments
-      .filter((p) => p.status === 'PENDING' || p.status === 'PARTIALLY_PAID')
+      .filter((p) => p.status === 'DUE' || p.status === 'PENDING' || p.status === 'PARTIALLY_PAID')
       .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  }
+
+  async deleteOrArchiveDonor(
+    donorId: string,
+    mode: AppMode
+  ): Promise<{ success: boolean; action: 'DELETED' | 'ARCHIVED' }> {
+    const db = await this.readDb();
+    const scope = mode === 'LIVE' ? db.liveData : db.testData;
+    const donorIndex = scope.donors.findIndex((d) => d.id === donorId);
+    if (donorIndex === -1) {
+      throw new Error('देणगीदार सापडला नाही.');
+    }
+
+    const hasFinancialHistory =
+      scope.payments.some((p) => p.donorId === donorId) ||
+      scope.pavtis.some((pav) => pav.donorId === donorId);
+
+    if (hasFinancialHistory) {
+      scope.donors[donorIndex].isArchived = true;
+      scope.donors[donorIndex].updatedAt = new Date().toISOString();
+      await this.writeDb(db);
+      return { success: true, action: 'ARCHIVED' };
+    } else {
+      scope.donors.splice(donorIndex, 1);
+      await this.writeDb(db);
+      return { success: true, action: 'DELETED' };
+    }
   }
 
   async getNextReceiptNumber(mode: AppMode): Promise<{ formatted: string; numeric: number }> {
@@ -359,6 +388,8 @@ export class LocalStorageProvider implements IStorageProvider {
     const scope = mode === 'LIVE' ? db.liveData : db.testData;
     const index = scope.payments.findIndex((p) => p.id === payment.id);
 
+    const isDue = payment.status === 'DUE' || payment.status === 'PENDING';
+
     const updatedPayment: Payment = {
       ...payment,
       mode,
@@ -369,6 +400,37 @@ export class LocalStorageProvider implements IStorageProvider {
       scope.payments[index] = updatedPayment;
     } else {
       scope.payments.push(updatedPayment);
+    }
+
+    // Auto-create/sync Pavti Record for both DUE and PAID
+    const existingPavtiIndex = scope.pavtis.findIndex((p) => p.paymentId === updatedPayment.id);
+    const amountVal = isDue ? updatedPayment.expectedAmount : updatedPayment.receivedAmount;
+    
+    const pavtiRecord: Pavti = {
+      id: existingPavtiIndex >= 0 ? scope.pavtis[existingPavtiIndex].id : `pavti-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+      receiptNumber: isDue ? '' : (updatedPayment.receiptNumber || ''),
+      numericReceiptNumber: isDue ? undefined : updatedPayment.numericReceiptNumber,
+      paymentId: updatedPayment.id,
+      donorId: updatedPayment.donorId,
+      donorName: updatedPayment.donorName,
+      donorMobile: updatedPayment.donorMobile,
+      donorAddress: updatedPayment.donorAddress,
+      amount: amountVal,
+      amountInWordsMarathi: numberToWordsMarathi(amountVal),
+      amountInWordsEnglish: numberToWordsEnglish(amountVal),
+      paymentMethod: updatedPayment.paymentMethod,
+      status: isDue ? 'DUE' : 'PAID',
+      transactionReference: updatedPayment.transactionReference,
+      date: updatedPayment.date,
+      hostName: updatedPayment.hostName,
+      mode,
+      generatedAt: new Date().toISOString(),
+    };
+
+    if (existingPavtiIndex >= 0) {
+      scope.pavtis[existingPavtiIndex] = pavtiRecord;
+    } else {
+      scope.pavtis.push(pavtiRecord);
     }
 
     // Update Donor summary stats if donorId is linked
@@ -392,13 +454,93 @@ export class LocalStorageProvider implements IStorageProvider {
     return updatedPayment;
   }
 
+  async updatePendingPayment(
+    paymentId: string,
+    data: {
+      donorName?: string;
+      donorMobile?: string;
+      donorAddress?: string;
+      expectedAmount?: number;
+      notes?: string;
+      date?: string;
+    },
+    mode: AppMode
+  ): Promise<Payment> {
+    const db = await this.readDb();
+    const scope = mode === 'LIVE' ? db.liveData : db.testData;
+    const payment = scope.payments.find((p) => p.id === paymentId);
+
+    if (!payment) {
+      throw new Error(`Payment with ID ${paymentId} not found.`);
+    }
+
+    if (payment.status === 'PAID') {
+      throw new Error('Paid payments cannot be modified via pending editor.');
+    }
+
+    if (data.donorName !== undefined) payment.donorName = data.donorName.trim();
+    if (data.donorMobile !== undefined) payment.donorMobile = data.donorMobile.trim();
+    if (data.donorAddress !== undefined) payment.donorAddress = data.donorAddress.trim();
+    if (data.expectedAmount !== undefined) {
+      payment.expectedAmount = data.expectedAmount;
+      payment.remainingAmount = Math.max(0, data.expectedAmount - (payment.receivedAmount || 0));
+    }
+    if (data.notes !== undefined) payment.notes = data.notes.trim();
+    if (data.date !== undefined) payment.date = data.date;
+    payment.updatedAt = new Date().toISOString();
+
+    // Also update donor if donorId exists
+    if (payment.donorId) {
+      const donor = scope.donors.find((d) => d.id === payment.donorId);
+      if (donor) {
+        if (data.donorName) donor.name = data.donorName.trim();
+        if (data.donorMobile !== undefined) donor.mobile = data.donorMobile.trim();
+        if (data.donorAddress !== undefined) donor.address = data.donorAddress.trim();
+        donor.updatedAt = new Date().toISOString();
+      }
+    }
+
+    await this.writeDb(db);
+    return payment;
+  }
+
+  async cancelPendingPayment(paymentId: string, mode: AppMode): Promise<Payment> {
+    const db = await this.readDb();
+    const scope = mode === 'LIVE' ? db.liveData : db.testData;
+    const payment = scope.payments.find((p) => p.id === paymentId);
+
+    if (!payment) {
+      throw new Error(`Payment with ID ${paymentId} not found.`);
+    }
+
+    payment.status = 'CANCELLED';
+    payment.updatedAt = new Date().toISOString();
+
+    scope.auditLogs.push({
+      id: `audit-${Date.now()}`,
+      userId: payment.hostId || 'system',
+      userName: payment.hostName || 'Host',
+      userRole: 'HOST',
+      action: 'PAYMENT_CANCELLED',
+      entityType: 'PAYMENT',
+      entityId: payment.id,
+      details: `Pending payment for ${payment.donorName} (₹${payment.expectedAmount}) was cancelled.`,
+      mode,
+      timestamp: new Date().toISOString(),
+    });
+
+    await this.writeDb(db);
+    return payment;
+  }
+
   async markPaymentAsPaid(
     paymentId: string,
     paymentDetails: {
       receivedAmount: number;
-      paymentMethod: 'CASH' | 'UPI' | 'OTHER';
+      paymentMethod: 'CASH' | 'UPI';
       transactionReference?: string;
       notes?: string;
+      paymentDate?: string;
       hostId: string;
       hostName: string;
     },
@@ -435,21 +577,25 @@ export class LocalStorageProvider implements IStorageProvider {
         ? `${payment.notes} | ${paymentDetails.notes}`
         : paymentDetails.notes;
     }
-    payment.date = new Date().toISOString().split('T')[0];
+    payment.date = paymentDetails.paymentDate || new Date().toISOString().split('T')[0];
     payment.updatedAt = new Date().toISOString();
 
-    // Generate Pavti Record
+    // Update or Generate Pavti Record (Do NOT create duplicate Pavti)
+    const existingPavtiIndex = scope.pavtis.findIndex((p) => p.paymentId === payment.id);
     const pavti: Pavti = {
-      id: `pavti-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+      id: existingPavtiIndex >= 0 ? scope.pavtis[existingPavtiIndex].id : `pavti-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
       receiptNumber: formattedReceiptNumber,
+      numericReceiptNumber: nextNumber,
       paymentId: payment.id,
       donorId: payment.donorId,
       donorName: payment.donorName,
       donorMobile: payment.donorMobile,
+      donorAddress: payment.donorAddress,
       amount: payment.receivedAmount,
       amountInWordsMarathi: numberToWordsMarathi(payment.receivedAmount),
       amountInWordsEnglish: numberToWordsEnglish(payment.receivedAmount),
       paymentMethod: payment.paymentMethod,
+      status: 'PAID',
       transactionReference: payment.transactionReference,
       date: payment.date,
       hostName: paymentDetails.hostName,
@@ -457,7 +603,11 @@ export class LocalStorageProvider implements IStorageProvider {
       generatedAt: new Date().toISOString(),
     };
 
-    scope.pavtis.push(pavti);
+    if (existingPavtiIndex >= 0) {
+      scope.pavtis[existingPavtiIndex] = pavti;
+    } else {
+      scope.pavtis.push(pavti);
+    }
 
     // Update Donor Stats
     const donor = scope.donors.find((d) => d.id === payment.donorId);
@@ -667,12 +817,17 @@ export class LocalStorageProvider implements IStorageProvider {
       }
     }
 
-    // Pending calculations (CRITICAL: Pending amounts are NEVER in totalCollection)
-    const pendingPayments = scope.payments.filter((p) => p.status === 'PENDING' || p.status === 'PARTIALLY_PAID');
-    const pendingAmount = pendingPayments.reduce((sum, p) => sum + (p.expectedAmount - p.receivedAmount), 0);
+    // Pending / Due calculations (CRITICAL: Due amounts are NEVER in totalCollection)
+    const pendingPayments = scope.payments.filter(
+      (p) => p.status === 'DUE' || p.status === 'PENDING' || p.status === 'PARTIALLY_PAID'
+    );
+    const pendingAmount = pendingPayments.reduce(
+      (sum, p) => sum + (p.expectedAmount - (p.receivedAmount || 0)),
+      0
+    );
     const partiallyPaidAmount = pendingPayments
       .filter((p) => p.status === 'PARTIALLY_PAID')
-      .reduce((sum, p) => sum + p.receivedAmount, 0);
+      .reduce((sum, p) => sum + (p.receivedAmount || 0), 0);
 
     return {
       totalCollection,
@@ -692,7 +847,7 @@ export class LocalStorageProvider implements IStorageProvider {
     };
   }
 
-  // --- Test Mode Operations ---
+  // --- Data Reset Operations ---
   async clearTestData(): Promise<{ deletedPayments: number; deletedDonors: number; deletedPavtis: number }> {
     const db = await this.readDb();
     const deletedPayments = db.testData.payments.length;
@@ -721,6 +876,54 @@ export class LocalStorageProvider implements IStorageProvider {
 
     await this.writeDb(db);
     return { deletedPayments, deletedDonors, deletedPavtis };
+  }
+
+  async resetAllData(
+    confirmation: string,
+    mode: AppMode,
+    user: { userId: string; userName: string; userRole: UserRole }
+  ): Promise<boolean> {
+    if (user.userRole !== 'SUPER_ADMIN') {
+      throw new Error('अनधिकृत: फक्त सुपर ॲडमिन संपूर्ण डेटा रीसेट करू शकतात.');
+    }
+    if (confirmation !== 'RESET') {
+      throw new Error('अवैध पुष्टीकरण: कृपया अचूक "RESET" टाईप करा.');
+    }
+
+    const db = await this.readDb();
+
+    if (mode === 'LIVE') {
+      db.liveData = {
+        receiptCounter: 0,
+        donors: [],
+        payments: [],
+        pavtis: [],
+        auditLogs: [
+          {
+            id: `audit-reset-${Date.now()}`,
+            userId: user.userId,
+            userName: user.userName,
+            userRole: user.userRole,
+            action: 'DATA_RESET',
+            entityType: 'SYSTEM',
+            details: `Full LIVE database reset performed by ${user.userName}.`,
+            mode: 'LIVE',
+            timestamp: new Date().toISOString(),
+          },
+        ],
+      };
+    } else {
+      db.testData = {
+        receiptCounter: 0,
+        donors: [],
+        payments: [],
+        pavtis: [],
+        auditLogs: [],
+      };
+    }
+
+    await this.writeDb(db);
+    return true;
   }
 
   // --- Backup & Restore ---

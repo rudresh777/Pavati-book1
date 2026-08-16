@@ -2,15 +2,19 @@
 
 import React, { useState, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { LogIn, Lock, Mail, ShieldAlert, Sparkles, UserCheck } from 'lucide-react';
+import { LogIn, Lock, Mail, ShieldAlert, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
-import { Input } from '@/components/ui/Input';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/Card';
+import { useLanguage } from '@/lib/context/language-context';
+import { useAppMode } from '@/lib/context/mode-context';
+import { cn } from '@/lib/utils/cn';
 
 function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const redirectUrl = searchParams.get('redirect') || '/dashboard';
+  const { language, setLanguage, t } = useLanguage();
+  const { setUser } = useAppMode();
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -32,13 +36,17 @@ function LoginForm() {
       const data = await res.json();
 
       if (!res.ok) {
-        throw new Error(data.error || 'लॉगिन अयशस्वी झाले.');
+        throw new Error(data.error || (language === 'mr' ? 'लॉगिन अयशस्वी झाले.' : 'Login failed.'));
+      }
+
+      if (data.user) {
+        setUser(data.user);
       }
 
       router.push(redirectUrl);
       router.refresh();
     } catch (err: any) {
-      setError(err.message || 'काहीतरी त्रुटी आली. कृपया पुन्हा प्रयत्न करा.');
+      setError(err.message || t('common.error'));
     } finally {
       setIsLoading(false);
     }
@@ -53,17 +61,50 @@ function LoginForm() {
   return (
     <div className="min-h-[80vh] flex items-center justify-center py-10 px-4">
       <div className="w-full max-w-md space-y-6">
-        {/* Header Branding */}
+        {/* Header Branding (Mandal identity name remains Marathi) */}
         <div className="text-center space-y-2">
           <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-orange-500 to-amber-600 flex items-center justify-center text-white font-devanagari font-black text-3xl shadow-xl mx-auto border-2 border-amber-300">
             ॐ
           </div>
           <h1 className="text-2xl font-black font-devanagari text-stone-900 tracking-tight">
-            डिजिटल पावती पुस्तक
+            मोरया गणेशोत्सव मंडळ
           </h1>
           <p className="text-xs font-semibold text-amber-800 uppercase tracking-wider">
-            मंडळ प्रतिनिधी / ॲडमिन सुरक्षित लॉगिन
+            {t('login.subtitle')}
           </p>
+        </div>
+
+        {/* LANGUAGE SELECTOR AT LOGIN PAGE */}
+        <div className="flex items-center justify-center gap-2">
+          <span className="text-xs font-semibold text-stone-600">
+            {t('login.selectLang')}
+          </span>
+          <div className="inline-flex items-center rounded-xl border border-amber-300 bg-amber-50/80 p-1 text-xs font-semibold shadow-sm">
+            <button
+              type="button"
+              onClick={() => setLanguage('mr')}
+              className={cn(
+                'px-3 py-1.5 rounded-lg text-xs font-devanagari transition-all',
+                language === 'mr'
+                  ? 'bg-orange-600 text-white font-bold shadow'
+                  : 'text-stone-700 hover:text-orange-900'
+              )}
+            >
+              मराठी
+            </button>
+            <button
+              type="button"
+              onClick={() => setLanguage('en')}
+              className={cn(
+                'px-3 py-1.5 rounded-lg text-xs font-sans transition-all',
+                language === 'en'
+                  ? 'bg-orange-600 text-white font-bold shadow'
+                  : 'text-stone-700 hover:text-orange-900'
+              )}
+            >
+              English
+            </button>
+          </div>
         </div>
 
         {/* Login Card */}
@@ -71,10 +112,10 @@ function LoginForm() {
           <CardHeader className="bg-amber-50/50 pb-4">
             <CardTitle className="text-base font-bold font-devanagari text-stone-900 flex items-center gap-2">
               <LogIn className="w-4 h-4 text-orange-600" />
-              <span>खात्यात प्रवेश करा (Sign In)</span>
+              <span>{t('login.cardTitle')}</span>
             </CardTitle>
             <CardDescription className="text-stone-500 text-xs">
-              कृपया आपला नोंदणीकृत ईमेल आणि पासवर्ड प्रविष्ट करा.
+              {t('login.cardDescription')}
             </CardDescription>
           </CardHeader>
 
@@ -89,7 +130,7 @@ function LoginForm() {
 
               <div className="space-y-1">
                 <label className="block text-xs font-bold text-stone-700 font-devanagari">
-                  ईमेल आयडी (Email)
+                  {t('login.emailLabel')}
                 </label>
                 <div className="relative">
                   <Mail className="w-4 h-4 text-stone-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
@@ -98,7 +139,7 @@ function LoginForm() {
                     required
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    placeholder="admin@mandal.org"
+                    placeholder={t('login.emailPlaceholder')}
                     className="w-full pl-10 pr-3.5 py-2.5 bg-white border border-stone-300 rounded-lg text-sm text-stone-900 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
                   />
                 </div>
@@ -106,7 +147,7 @@ function LoginForm() {
 
               <div className="space-y-1">
                 <label className="block text-xs font-bold text-stone-700 font-devanagari">
-                  पासवर्ड (Password)
+                  {t('login.passwordLabel')}
                 </label>
                 <div className="relative">
                   <Lock className="w-4 h-4 text-stone-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
@@ -128,7 +169,7 @@ function LoginForm() {
                   isLoading={isLoading}
                   className="w-full py-2.5 font-bold font-devanagari shadow-md"
                 >
-                  <span>लॉगिन करा (Sign In)</span>
+                  <span>{t('login.signInBtn')}</span>
                 </Button>
 
                 <button
@@ -136,7 +177,7 @@ function LoginForm() {
                   onClick={() => router.push(redirectUrl)}
                   className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-md transition-all flex items-center justify-center gap-2 font-devanagari"
                 >
-                  <span>🔓 थेट डॅशबोर्डवर जा (Bypass Login)</span>
+                  <span>{t('login.bypassBtn')}</span>
                 </button>
               </div>
             </form>
@@ -145,7 +186,7 @@ function LoginForm() {
             <div className="mt-6 pt-5 border-t border-stone-200 space-y-2.5">
               <div className="text-[11px] font-bold uppercase text-stone-500 flex items-center gap-1.5">
                 <Sparkles className="w-3.5 h-3.5 text-amber-600" />
-                <span>चाचणी लॉगिन माहिती (1-Click Auto Fill):</span>
+                <span>{t('login.demoTitle')}</span>
               </div>
 
               <div className="grid grid-cols-2 gap-2">
@@ -155,7 +196,7 @@ function LoginForm() {
                   className="p-2.5 bg-amber-50 hover:bg-amber-100/80 border border-amber-200 rounded-lg text-left transition-colors"
                 >
                   <div className="text-[11px] font-bold text-amber-900 font-devanagari">
-                    👑 सुपर ॲडमिन
+                    {t('login.demoSuperAdmin')}
                   </div>
                   <div className="text-[10px] text-stone-600 truncate">admin@mandal.org</div>
                   <div className="text-[10px] text-stone-400">Pass: admin123</div>
@@ -167,7 +208,7 @@ function LoginForm() {
                   className="p-2.5 bg-stone-50 hover:bg-stone-100 border border-stone-200 rounded-lg text-left transition-colors"
                 >
                   <div className="text-[11px] font-bold text-stone-900 font-devanagari">
-                    🚩 मंडळ प्रतिनिधी
+                    {t('login.demoHost')}
                   </div>
                   <div className="text-[10px] text-stone-600 truncate">host@mandal.org</div>
                   <div className="text-[10px] text-stone-400">Pass: host123</div>
@@ -183,7 +224,7 @@ function LoginForm() {
 
 export default function LoginPage() {
   return (
-    <Suspense fallback={<div className="text-center py-20">लोड होत आहे...</div>}>
+    <Suspense fallback={<div className="text-center py-20">Loading...</div>}>
       <LoginForm />
     </Suspense>
   );

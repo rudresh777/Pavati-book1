@@ -1,7 +1,12 @@
+'use client';
+
 import React from 'react';
 import Link from 'next/link';
+import { useLanguage } from '@/lib/context/language-context';
 
 export function Footer({ mandalName = 'मोरया गणेशोत्सव मंडळ' }: { mandalName?: string }) {
+  const { t } = useLanguage();
+
   return (
     <footer className="bg-stone-900 text-stone-300 mt-auto border-t border-stone-800">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -13,21 +18,21 @@ export function Footer({ mandalName = 'मोरया गणेशोत्स�
               <span>॥ मंगलमूर्ती मोरया ॥</span>
             </div>
             <p className="text-xs text-stone-400">
-              © {new Date().getFullYear()} {mandalName}. सर्व हक्क सुरक्षित.
+              © {new Date().getFullYear()} {mandalName}. All rights reserved.
             </p>
           </div>
 
           <div className="flex items-center gap-4 text-xs text-stone-400 font-devanagari">
             <Link href="/" className="hover:text-amber-400 transition-colors">
-              मुखपृष्ठ
+              {t('nav.home')}
             </Link>
             <span>•</span>
             <Link href="/announcements" className="hover:text-amber-400 transition-colors">
-              सूचना फलक
+              {t('nav.announcements')}
             </Link>
             <span>•</span>
             <Link href="/login" className="hover:text-amber-400 transition-colors">
-              प्रतिनिधी लॉगिन
+              {t('nav.login')}
             </Link>
           </div>
         </div>

@@ -1,27 +1,44 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { Bell, Plus, Trash2, Edit2, Calendar, MapPin, CheckCircle, Eye } from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
+import {
+  Bell,
+  Plus,
+  Trash2,
+  Edit2,
+  Calendar,
+  Clock,
+  MapPin,
+  CheckCircle,
+  Eye,
+  Archive,
+  EyeOff,
+} from 'lucide-react';
+import { Card, CardContent } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Modal } from '@/components/ui/Modal';
 import { Badge } from '@/components/ui/Badge';
 import { Announcement } from '@/types';
+import { useLanguage } from '@/lib/context/language-context';
 
 export default function ManageAnnouncementsPage() {
+  const { language } = useLanguage();
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [previewItem, setPreviewItem] = useState<Announcement | null>(null);
 
-  // Form
+  // Form State
   const [editingId, setEditingId] = useState<string | null>(null);
   const [titleMarathi, setTitleMarathi] = useState('');
   const [titleEnglish, setTitleEnglish] = useState('');
   const [contentMarathi, setContentMarathi] = useState('');
   const [contentEnglish, setContentEnglish] = useState('');
   const [venue, setVenue] = useState('');
+  const [time, setTime] = useState('');
+  const [date, setDate] = useState('');
+  const [status, setStatus] = useState<'DRAFT' | 'PUBLISHED' | 'UNPUBLISHED' | 'ARCHIVED'>('PUBLISHED');
   const [priority, setPriority] = useState<'NORMAL' | 'HIGH' | 'URGENT'>('NORMAL');
-  const [active, setActive] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formError, setFormError] = useState('');
 
@@ -49,8 +66,10 @@ export default function ManageAnnouncementsPage() {
     setContentMarathi('');
     setContentEnglish('');
     setVenue('');
+    setTime('');
+    setDate(new Date().toISOString().split('T')[0]);
+    setStatus('PUBLISHED');
     setPriority('NORMAL');
-    setActive(true);
     setFormError('');
     setIsModalOpen(true);
   };
@@ -62,10 +81,34 @@ export default function ManageAnnouncementsPage() {
     setContentMarathi(item.contentMarathi);
     setContentEnglish(item.contentEnglish || '');
     setVenue(item.venue || '');
-    setPriority(item.priority);
-    setActive(item.active);
+    setTime(item.time || '');
+    setDate(item.date || new Date().toISOString().split('T')[0]);
+    setStatus(item.status || (item.active ? 'PUBLISHED' : 'DRAFT'));
+    setPriority(item.priority || 'NORMAL');
     setFormError('');
     setIsModalOpen(true);
+  };
+
+  const handleQuickStatusChange = async (
+    id: string,
+    newStatus: 'DRAFT' | 'PUBLISHED' | 'UNPUBLISHED' | 'ARCHIVED'
+  ) => {
+    const item = announcements.find((a) => a.id === id);
+    if (!item) return;
+
+    try {
+      await fetch('/api/announcements', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ...item,
+          status: newStatus,
+        }),
+      });
+      fetchAnnouncements();
+    } catch (err) {
+      console.error('Error changing status:', err);
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -89,8 +132,10 @@ export default function ManageAnnouncementsPage() {
           contentMarathi: contentMarathi.trim(),
           contentEnglish: contentEnglish.trim(),
           venue: venue.trim(),
+          time: time.trim(),
+          date: date || new Date().toISOString().split('T')[0],
+          status,
           priority,
-          active,
         }),
       });
 
@@ -107,7 +152,7 @@ export default function ManageAnnouncementsPage() {
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm('तुम्हाला ही सूचना हटवायची आहे का?')) return;
+    if (!confirm('तुम्हाला ही सूचना कायमस्वरूपी हटवायची आहे का?')) return;
     try {
       await fetch(`/api/announcements?id=${id}`, { method: 'DELETE' });
       fetchAnnouncements();
@@ -126,7 +171,7 @@ export default function ManageAnnouncementsPage() {
             <span>मंडळ सूचना व्यवस्थापन (Announcements CMS)</span>
           </h1>
           <p className="text-xs text-stone-500 font-devanagari">
-            वेबसाईटवरील सूचना फलकावर प्रसिद्ध करण्यासाठी नवीन सूचना तयार करा किंवा संपादित करा.
+            वेबसाईटवरील सूचना फलकावर प्रसिद्ध करण्यासाठी नवीन सूचना तयार करा, संपादित करा, प्रसिद्ध (Publish) किंवा अप्रकाशित करा.
           </p>
         </div>
 
@@ -143,70 +188,133 @@ export default function ManageAnnouncementsPage() {
 
       {/* Announcements List */}
       <div className="space-y-3">
-        {announcements.map((item) => (
-          <Card key={item.id} className="border-stone-200">
-            <CardContent className="p-5 flex flex-col sm:flex-row sm:items-start justify-between gap-4">
-              <div className="space-y-1.5 flex-1">
-                <div className="flex items-center gap-2">
-                  <Badge variant={item.priority === 'HIGH' ? 'danger' : 'gold'}>
-                    {item.priority}
-                  </Badge>
-                  <Badge variant={item.active ? 'success' : 'default'}>
-                    {item.active ? 'प्रसिद्ध (Active)' : 'अप्रकाशित (Draft)'}
-                  </Badge>
-                  <span className="text-xs text-stone-400 font-mono">{item.date}</span>
-                </div>
-
-                <h3 className="text-base font-bold text-stone-900 font-devanagari">
-                  {item.titleMarathi}
-                </h3>
-
-                <p className="text-xs text-stone-600 font-devanagari line-clamp-2">
-                  {item.contentMarathi}
-                </p>
-
-                {item.venue && (
-                  <div className="text-[11px] text-stone-500 font-devanagari">
-                    📍 {item.venue}
-                  </div>
-                )}
-              </div>
-
-              <div className="flex items-center gap-2 self-end sm:self-center">
-                <button
-                  onClick={() => handleOpenEditModal(item)}
-                  className="p-2 text-stone-600 hover:text-orange-600 rounded-lg hover:bg-stone-100"
-                  title="संपादित करा"
-                >
-                  <Edit2 className="w-4 h-4" />
-                </button>
-                <button
-                  onClick={() => handleDelete(item.id)}
-                  className="p-2 text-stone-400 hover:text-red-600 rounded-lg hover:bg-red-50"
-                  title="हटवा"
-                >
-                  <Trash2 className="w-4 h-4" />
-                </button>
-              </div>
+        {announcements.length === 0 ? (
+          <Card className="border-dashed border-stone-300">
+            <CardContent className="p-12 text-center text-stone-400 font-devanagari space-y-2">
+              <Bell className="w-10 h-10 mx-auto opacity-50" />
+              <div className="font-bold text-stone-700">कोणतीही सूचना उपलब्ध नाही.</div>
             </CardContent>
           </Card>
-        ))}
+        ) : (
+          announcements.map((item) => {
+            const itemStatus = item.status || (item.active ? 'PUBLISHED' : 'DRAFT');
+            return (
+              <Card key={item.id} className="border-stone-200 hover:border-amber-300 transition-colors shadow-sm">
+                <CardContent className="p-5 flex flex-col sm:flex-row sm:items-start justify-between gap-4">
+                  <div className="space-y-1.5 flex-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Badge
+                        variant={
+                          itemStatus === 'PUBLISHED'
+                            ? 'success'
+                            : itemStatus === 'DRAFT'
+                            ? 'default'
+                            : itemStatus === 'UNPUBLISHED'
+                            ? 'warning'
+                            : 'danger'
+                        }
+                      >
+                        {itemStatus === 'PUBLISHED'
+                          ? 'प्रसिद्ध (PUBLISHED)'
+                          : itemStatus === 'DRAFT'
+                          ? 'मसुदा (DRAFT)'
+                          : itemStatus === 'UNPUBLISHED'
+                          ? 'अप्रकाशित (UNPUBLISHED)'
+                          : 'संग्रहित (ARCHIVED)'}
+                      </Badge>
+
+                      <Badge variant={item.priority === 'HIGH' ? 'danger' : 'gold'}>
+                        {item.priority === 'HIGH' ? 'महत्त्वाची' : item.priority === 'URGENT' ? 'तातडीची' : 'सामान्य'}
+                      </Badge>
+
+                      <span className="text-xs text-stone-400 font-mono">📅 {item.date}</span>
+                      {item.time && <span className="text-xs text-stone-400 font-mono">⏰ {item.time}</span>}
+                    </div>
+
+                    <h3 className="text-base font-bold text-stone-900 font-devanagari">
+                      {item.titleMarathi}
+                    </h3>
+
+                    <p className="text-xs text-stone-600 font-devanagari line-clamp-2">
+                      {item.contentMarathi}
+                    </p>
+
+                    {item.venue && (
+                      <div className="text-[11px] text-stone-500 font-devanagari flex items-center gap-1">
+                        <MapPin className="w-3.5 h-3.5 text-orange-600" />
+                        <span>स्थान: {item.venue}</span>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Actions */}
+                  <div className="flex flex-wrap items-center gap-1.5 self-end sm:self-center">
+                    {itemStatus !== 'PUBLISHED' ? (
+                      <button
+                        onClick={() => handleQuickStatusChange(item.id, 'PUBLISHED')}
+                        className="px-2.5 py-1 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-300 rounded-lg text-xs font-bold font-devanagari flex items-center gap-1"
+                        title="प्रसिद्ध करा"
+                      >
+                        <CheckCircle className="w-3.5 h-3.5" />
+                        <span>प्रसिद्ध करा</span>
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() => handleQuickStatusChange(item.id, 'UNPUBLISHED')}
+                        className="px-2.5 py-1 bg-amber-50 text-amber-800 hover:bg-amber-100 border border-amber-300 rounded-lg text-xs font-bold font-devanagari flex items-center gap-1"
+                        title="अप्रकाशित करा"
+                      >
+                        <EyeOff className="w-3.5 h-3.5" />
+                        <span>अप्रकाशित</span>
+                      </button>
+                    )}
+
+                    <button
+                      onClick={() => setPreviewItem(item)}
+                      className="p-1.5 text-stone-600 hover:text-orange-600 rounded-lg hover:bg-stone-100"
+                      title="पूर्वावलोकन पहा (Preview)"
+                    >
+                      <Eye className="w-4 h-4" />
+                    </button>
+
+                    <button
+                      onClick={() => handleOpenEditModal(item)}
+                      className="p-1.5 text-stone-600 hover:text-orange-600 rounded-lg hover:bg-stone-100"
+                      title="संपादित करा (Edit)"
+                    >
+                      <Edit2 className="w-4 h-4" />
+                    </button>
+
+                    <button
+                      onClick={() => handleDelete(item.id)}
+                      className="p-1.5 text-stone-400 hover:text-red-600 rounded-lg hover:bg-red-50"
+                      title="हटवा (Delete)"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+                </CardContent>
+              </Card>
+            );
+          })
+        )}
       </div>
 
-      {/* MODAL */}
+      {/* CREATE / EDIT MODAL */}
       <Modal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
         title={editingId ? 'सूचना संपादित करा' : 'नवीन सूचना तयार करा'}
         maxWidth="lg"
       >
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-4 pt-1">
           {formError && (
-            <div className="p-3 bg-red-50 text-red-700 rounded-lg text-xs font-bold">
+            <div className="p-3 bg-red-50 text-red-700 rounded-lg text-xs font-bold font-devanagari">
               {formError}
             </div>
           )}
 
+          {/* Title */}
           <div className="space-y-1">
             <label className="block text-xs font-bold text-stone-700 font-devanagari">
               सूचनेचे शीर्षक (मराठी) *
@@ -216,11 +324,12 @@ export default function ManageAnnouncementsPage() {
               required
               value={titleMarathi}
               onChange={(e) => setTitleMarathi(e.target.value)}
-              placeholder="उदा. गणेश आगमन मिरवणूक व आरती वेळ"
+              placeholder="उदा. गणेश आगमन मिरवणूक व महाआरती"
               className="w-full px-3.5 py-2 border border-stone-300 rounded-lg text-xs font-devanagari font-bold"
             />
           </div>
 
+          {/* Content */}
           <div className="space-y-1">
             <label className="block text-xs font-bold text-stone-700 font-devanagari">
               सूचनेचा संपूर्ण मजकूर (मराठी) *
@@ -235,20 +344,49 @@ export default function ManageAnnouncementsPage() {
             />
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          {/* Date, Time, Venue Grid */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div className="space-y-1">
               <label className="block text-xs font-bold text-stone-700 font-devanagari">
-                स्थान / पत्ता (ऐच्छिक)
+                दिनांक (Date)
+              </label>
+              <input
+                type="date"
+                value={date}
+                onChange={(e) => setDate(e.target.value)}
+                className="w-full px-3 py-2 border border-stone-300 rounded-lg text-xs font-mono"
+              />
+            </div>
+
+            <div className="space-y-1">
+              <label className="block text-xs font-bold text-stone-700 font-devanagari">
+                वेळ (Time - ऐच्छिक)
+              </label>
+              <input
+                type="text"
+                value={time}
+                onChange={(e) => setTime(e.target.value)}
+                placeholder="उदा. सायं. ७:३०"
+                className="w-full px-3 py-2 border border-stone-300 rounded-lg text-xs font-devanagari"
+              />
+            </div>
+
+            <div className="space-y-1">
+              <label className="block text-xs font-bold text-stone-700 font-devanagari">
+                स्थान / पत्ता (Venue)
               </label>
               <input
                 type="text"
                 value={venue}
                 onChange={(e) => setVenue(e.target.value)}
-                placeholder="मंडळ मंडप, लक्ष्मी रोड"
-                className="w-full px-3.5 py-2 border border-stone-300 rounded-lg text-xs font-devanagari"
+                placeholder="उदा. मंडळ मुख्य मंडप"
+                className="w-full px-3 py-2 border border-stone-300 rounded-lg text-xs font-devanagari"
               />
             </div>
+          </div>
 
+          {/* Priority and Status Grid */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
             <div className="space-y-1">
               <label className="block text-xs font-bold text-stone-700 font-devanagari">
                 प्राधान्य (Priority)
@@ -256,37 +394,70 @@ export default function ManageAnnouncementsPage() {
               <select
                 value={priority}
                 onChange={(e) => setPriority(e.target.value as any)}
-                className="w-full px-3 py-2 border border-stone-300 rounded-lg text-xs"
+                className="w-full px-3 py-2 border border-stone-300 rounded-lg text-xs font-devanagari"
               >
                 <option value="NORMAL">सामान्य (Normal)</option>
                 <option value="HIGH">महत्त्वाची (High)</option>
                 <option value="URGENT">तातडीची (Urgent)</option>
               </select>
             </div>
-          </div>
 
-          <div className="pt-2">
-            <label className="flex items-center gap-2 text-xs font-bold text-stone-700 font-devanagari cursor-pointer">
-              <input
-                type="checkbox"
-                checked={active}
-                onChange={(e) => setActive(e.target.checked)}
-                className="rounded text-orange-600"
-              />
-              <span>वेबसाईटवर लगेच प्रसिद्ध करा (Publish Immediately)</span>
-            </label>
+            <div className="space-y-1">
+              <label className="block text-xs font-bold text-stone-700 font-devanagari">
+                स्थिती (Publication Status)
+              </label>
+              <select
+                value={status}
+                onChange={(e) => setStatus(e.target.value as any)}
+                className="w-full px-3 py-2 border border-stone-300 rounded-lg text-xs font-devanagari font-bold"
+              >
+                <option value="PUBLISHED">🟢 प्रसिद्ध करा (PUBLISHED - Live)</option>
+                <option value="DRAFT">⚪ मसुदा ठेवा (DRAFT)</option>
+                <option value="UNPUBLISHED">🟡 अप्रकाशित (UNPUBLISHED)</option>
+                <option value="ARCHIVED">🔴 संग्रहित (ARCHIVED)</option>
+              </select>
+            </div>
           </div>
 
           <div className="pt-3 flex items-center justify-end gap-2 border-t border-stone-100">
             <Button type="button" variant="outline" size="sm" onClick={() => setIsModalOpen(false)}>
               रद्द करा
             </Button>
-            <Button type="submit" variant="primary" size="sm" isLoading={isSubmitting} className="font-devanagari">
+            <Button type="submit" variant="primary" size="sm" isLoading={isSubmitting} className="font-devanagari font-bold px-4">
               सेव्ह करा
             </Button>
           </div>
         </form>
       </Modal>
+
+      {/* PREVIEW MODAL */}
+      {previewItem && (
+        <Modal
+          isOpen={!!previewItem}
+          onClose={() => setPreviewItem(null)}
+          title="सूचना पूर्वावलोकन (Announcement Preview)"
+          maxWidth="md"
+        >
+          <div className="p-4 bg-amber-50 border border-amber-300 rounded-2xl space-y-3 font-devanagari">
+            <div className="flex items-center justify-between text-xs text-stone-500">
+              <span className="font-bold text-orange-800 uppercase tracking-wider">
+                महत्त्वाची सूचना
+              </span>
+              <span>📅 {previewItem.date} {previewItem.time && `• ⏰ ${previewItem.time}`}</span>
+            </div>
+            <h3 className="text-lg font-bold text-stone-900">{previewItem.titleMarathi}</h3>
+            <p className="text-xs sm:text-sm text-stone-700 leading-relaxed whitespace-pre-wrap">
+              {previewItem.contentMarathi}
+            </p>
+            {previewItem.venue && (
+              <div className="text-xs text-amber-900 font-semibold pt-1 flex items-center gap-1">
+                <MapPin className="w-3.5 h-3.5 text-orange-600" />
+                <span>स्थान: {previewItem.venue}</span>
+              </div>
+            )}
+          </div>
+        </Modal>
+      )}
     </div>
   );
 }
