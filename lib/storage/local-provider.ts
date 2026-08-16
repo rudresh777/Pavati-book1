@@ -373,10 +373,35 @@ export class LocalStorageProvider implements IStorageProvider {
     const scope = mode === 'LIVE' ? db.liveData : db.testData;
     const settings = db.settings;
 
-    const baseCounter = scope.receiptCounter || 0;
-    const nextNumber = Math.max(baseCounter + 1, settings.startingReceiptNumber || 1);
-    
-    // Format as 6-digit padded number: 000001, 000002
+    let maxNumber = Math.max(
+      scope.receiptCounter || 0,
+      (scope as any).lastReceiptNumber || 0,
+      (settings.startingReceiptNumber || 1) - 1
+    );
+
+    for (const p of (scope.payments || [])) {
+      if (p.numericReceiptNumber && p.numericReceiptNumber > maxNumber) {
+        maxNumber = p.numericReceiptNumber;
+      } else if (p.receiptNumber) {
+        const num = parseInt(p.receiptNumber.replace(/\D/g, ''), 10);
+        if (!isNaN(num) && num > maxNumber) {
+          maxNumber = num;
+        }
+      }
+    }
+
+    for (const pav of (scope.pavtis || [])) {
+      if (pav.numericReceiptNumber && pav.numericReceiptNumber > maxNumber) {
+        maxNumber = pav.numericReceiptNumber;
+      } else if (pav.receiptNumber) {
+        const num = parseInt(pav.receiptNumber.replace(/\D/g, ''), 10);
+        if (!isNaN(num) && num > maxNumber) {
+          maxNumber = num;
+        }
+      }
+    }
+
+    const nextNumber = maxNumber + 1;
     const prefix = settings.receiptPrefix || '';
     const formatted = `${prefix}${String(nextNumber).padStart(6, '0')}`;
 
@@ -402,8 +427,16 @@ export class LocalStorageProvider implements IStorageProvider {
       scope.payments.push(updatedPayment);
     }
 
+    // Update receiptCounter if this is a PAID payment with a numeric receipt number
+    if (updatedPayment.status === 'PAID' && updatedPayment.numericReceiptNumber) {
+      scope.receiptCounter = Math.max(scope.receiptCounter || 0, updatedPayment.numericReceiptNumber);
+      (scope as any).lastReceiptNumber = scope.receiptCounter;
+    }
+
     // Auto-create/sync Pavti Record for both DUE and PAID
-    const existingPavtiIndex = scope.pavtis.findIndex((p) => p.paymentId === updatedPayment.id);
+    const existingPavtiIndex = scope.pavtis.findIndex(
+      (p) => p.paymentId === updatedPayment.id || (updatedPayment.receiptNumber && p.receiptNumber === updatedPayment.receiptNumber)
+    );
     const amountVal = isDue ? updatedPayment.expectedAmount : updatedPayment.receivedAmount;
     
     const pavtiRecord: Pavti = {
@@ -554,13 +587,10 @@ export class LocalStorageProvider implements IStorageProvider {
       throw new Error(`Payment with ID ${paymentId} not found.`);
     }
 
-    // Assign next atomic receipt number
-    const baseCounter = scope.receiptCounter || 0;
-    const nextNumber = Math.max(baseCounter + 1, db.settings.startingReceiptNumber || 1);
+    // Assign next atomic receipt number using global max check
+    const { formatted: formattedReceiptNumber, numeric: nextNumber } = await this.getNextReceiptNumber(mode);
     scope.receiptCounter = nextNumber;
-
-    const prefix = db.settings.receiptPrefix || '';
-    const formattedReceiptNumber = `${prefix}${String(nextNumber).padStart(6, '0')}`;
+    (scope as any).lastReceiptNumber = nextNumber;
 
     // Update payment record
     payment.status = 'PAID';
@@ -581,7 +611,9 @@ export class LocalStorageProvider implements IStorageProvider {
     payment.updatedAt = new Date().toISOString();
 
     // Update or Generate Pavti Record (Do NOT create duplicate Pavti)
-    const existingPavtiIndex = scope.pavtis.findIndex((p) => p.paymentId === payment.id);
+    const existingPavtiIndex = scope.pavtis.findIndex(
+      (p) => p.paymentId === payment.id || (payment.receiptNumber && p.receiptNumber === payment.receiptNumber)
+    );
     const pavti: Pavti = {
       id: existingPavtiIndex >= 0 ? scope.pavtis[existingPavtiIndex].id : `pavti-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
       receiptNumber: formattedReceiptNumber,
@@ -667,12 +699,19 @@ export class LocalStorageProvider implements IStorageProvider {
   async savePavti(pavti: Pavti, mode: AppMode): Promise<Pavti> {
     const db = await this.readDb();
     const scope = mode === 'LIVE' ? db.liveData : db.testData;
-    const index = scope.pavtis.findIndex((p) => p.id === pavti.id);
+    const index = scope.pavtis.findIndex(
+      (p) => p.id === pavti.id || (pavti.paymentId && p.paymentId === pavti.paymentId)
+    );
 
     if (index >= 0) {
       scope.pavtis[index] = pavti;
     } else {
       scope.pavtis.push(pavti);
+    }
+
+    if (pavti.numericReceiptNumber) {
+      scope.receiptCounter = Math.max(scope.receiptCounter || 0, pavti.numericReceiptNumber);
+      (scope as any).lastReceiptNumber = scope.receiptCounter;
     }
 
     await this.writeDb(db);

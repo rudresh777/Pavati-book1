@@ -270,25 +270,31 @@ export default function PaymentsLedgerPage() {
                         variant={
                           p.status === 'PAID'
                             ? 'success'
-                            : p.status === 'PENDING'
+                            : (p.status === 'DUE' || p.status === 'PENDING')
                             ? 'warning'
                             : 'danger'
                         }
                       >
                         {p.status === 'PAID'
                           ? t('common.status.paid')
-                          : p.status === 'PENDING'
-                          ? t('common.status.pending')
+                          : (p.status === 'DUE' || p.status === 'PENDING')
+                          ? 'बाकी (Due)'
                           : t('common.status.cancelled')}
                       </Badge>
                     </td>
                     <td className="px-4 py-3">
-                      <div className="font-devanagari font-semibold text-stone-800">
-                        {p.paymentMethod === 'CASH' ? t('dashboard.cash') : 'UPI'}
-                      </div>
-                      {p.transactionReference && (
-                        <div className="text-[10px] text-stone-400 font-mono">
-                          Ref: {p.transactionReference}
+                      {p.status === 'DUE' || p.status === 'PENDING' ? (
+                        <span className="px-2 py-0.5 bg-amber-100 text-amber-900 border border-amber-300 rounded font-semibold text-[11px] font-devanagari">
+                          बाकी / DUE
+                        </span>
+                      ) : (
+                        <div className="font-devanagari font-semibold text-stone-800">
+                          {p.paymentMethod === 'CASH' ? t('dashboard.cash') : 'UPI'}
+                          {p.transactionReference && (
+                            <div className="text-[10px] text-stone-400 font-mono">
+                              Ref: {p.transactionReference}
+                            </div>
+                          )}
                         </div>
                       )}
                     </td>

@@ -341,8 +341,9 @@ export default function DashboardPage() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-stone-100">
-                    {recentPayments
+                    {[...recentPayments]
                       .filter((p) => p.status === 'PAID')
+                      .sort((a, b) => (b.numericReceiptNumber || parseInt(b.receiptNumber?.replace(/\D/g, '') || '0', 10)) - (a.numericReceiptNumber || parseInt(a.receiptNumber?.replace(/\D/g, '') || '0', 10)))
                       .map((payment) => (
                         <tr key={payment.id} className="hover:bg-amber-50/40 transition-colors">
                           <td className="px-4 py-3 font-mono font-bold text-orange-800">

@@ -112,9 +112,9 @@ export async function POST(request: Request) {
     const paymentId = `pay-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
     const today = new Date().toISOString().split('T')[0];
 
-    // 2. Handle PAID payment
+    // 2. Handle PAID payment (Serial numbering: 000001, 000002, 000003...)
     if (status === 'PAID') {
-      // Assign atomic official receipt number
+      // Assign strictly sequential official receipt number
       const { formatted: formattedReceiptNumber, numeric: nextNumber } =
         await storage.getNextReceiptNumber(mode as AppMode);
 
@@ -141,31 +141,9 @@ export async function POST(request: Request) {
         updatedAt: new Date().toISOString(),
       };
 
+      // savePayment atomically persists payment and synchronizes single Pavti record
       await storage.savePayment(payment, mode as AppMode);
-
-      // Create Pavti Record
-      const pavti: Pavti = {
-        id: `pavti-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
-        receiptNumber: formattedReceiptNumber,
-        numericReceiptNumber: nextNumber,
-        paymentId: payment.id,
-        donorId: finalDonorId,
-        donorName: donorName.trim(),
-        donorMobile: donorMobile?.trim() || '',
-        donorAddress: donorAddress?.trim() || '',
-        amount: numAmount,
-        amountInWordsMarathi: numberToWordsMarathi(numAmount),
-        amountInWordsEnglish: numberToWordsEnglish(numAmount),
-        paymentMethod: paymentMethod as PaymentMethod,
-        status: 'PAID',
-        transactionReference: transactionReference?.trim() || '',
-        date: today,
-        hostName: session.name,
-        mode: mode as AppMode,
-        generatedAt: new Date().toISOString(),
-      };
-
-      await storage.savePavti(pavti, mode as AppMode);
+      const pavti = await storage.getPavtiByPaymentId(payment.id, mode as AppMode);
 
       // Audit Log
       await storage.addAuditLog({
@@ -174,7 +152,7 @@ export async function POST(request: Request) {
         userRole: session.role,
         action: 'PAVTI_GENERATED',
         entityType: 'PAVTI',
-        entityId: pavti.id,
+        entityId: pavti?.id || payment.id,
         details: `Generated Pavti #${formattedReceiptNumber} (₹${numAmount}) for ${donorName}.`,
         mode: mode as AppMode,
       });
@@ -211,30 +189,9 @@ export async function POST(request: Request) {
       updatedAt: new Date().toISOString(),
     };
 
+    // savePayment creates payment and single Due Pavti record
     await storage.savePayment(duePayment, mode as AppMode);
-
-    // Create Due Pavti Record (Same design, status DUE, no numeric receipt number)
-    const duePavti: Pavti = {
-      id: `pavti-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
-      receiptNumber: '',
-      paymentId: duePayment.id,
-      donorId: finalDonorId,
-      donorName: donorName.trim(),
-      donorMobile: donorMobile?.trim() || '',
-      donorAddress: donorAddress?.trim() || '',
-      amount: numExpected,
-      amountInWordsMarathi: numberToWordsMarathi(numExpected),
-      amountInWordsEnglish: numberToWordsEnglish(numExpected),
-      paymentMethod: paymentMethod as PaymentMethod,
-      status: 'DUE',
-      transactionReference: transactionReference?.trim() || '',
-      date: today,
-      hostName: session.name,
-      mode: mode as AppMode,
-      generatedAt: new Date().toISOString(),
-    };
-
-    await storage.savePavti(duePavti, mode as AppMode);
+    const duePavti = await storage.getPavtiByPaymentId(duePayment.id, mode as AppMode);
 
     await storage.addAuditLog({
       userId: session.userId,
