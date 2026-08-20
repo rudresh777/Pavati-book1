@@ -46,7 +46,7 @@ async function runMigration() {
 
   const supabase = createClient(supabaseUrl, serviceKey, {
     auth: { persistSession: false, autoRefreshToken: false },
-    realtime: { transport: ws },
+    realtime: { transport: ws as any },
   });
 
   const dbJsonPath = path.join(process.cwd(), 'data', 'mandal_database.json');
@@ -98,21 +98,47 @@ async function runMigration() {
   // 2. Migrate Users
   if (Array.isArray(db.users) && db.users.length > 0) {
     console.log(`\n👥 Migrating ${db.users.length} Users...`);
-    const usersPayload = db.users.map((u: any) => ({
-      id: u.id,
-      name: u.name,
-      email: u.email.trim().toLowerCase(),
-      password_hash: u.passwordHash,
-      role: u.role,
-      phone: u.phone || null,
-      active: u.active ?? true,
-      created_at: u.createdAt || new Date().toISOString(),
-      updated_at: u.updatedAt || new Date().toISOString(),
-    }));
+    for (const u of db.users) {
+      const userPayload = {
+        id: u.id,
+        name: u.name,
+        email: u.email.trim().toLowerCase(),
+        password_hash: u.passwordHash,
+        role: u.role,
+        phone: u.phone || null,
+        active: u.active ?? true,
+        created_at: u.createdAt || new Date().toISOString(),
+        updated_at: u.updatedAt || new Date().toISOString(),
+      };
 
-    const { error } = await supabase.from('users').upsert(usersPayload, { onConflict: 'id' });
-    if (error) console.error('  ⚠️  Users error:', error.message);
-    else console.log(`  ✅ Migrated ${usersPayload.length} users.`);
+      // Check if user with this email exists
+      const { data: existingUser } = await supabase
+        .from('users')
+        .select('id')
+        .eq('email', userPayload.email)
+        .maybeSingle();
+
+      if (existingUser) {
+        // Update user
+        const { error } = await supabase
+          .from('users')
+          .update({
+            name: userPayload.name,
+            password_hash: userPayload.password_hash,
+            role: userPayload.role,
+            phone: userPayload.phone,
+            active: userPayload.active,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('email', userPayload.email);
+        if (error) console.error(`  ⚠️  User (${userPayload.email}) update error:`, error.message);
+        else console.log(`  ✅ Updated user ${userPayload.name} (${userPayload.email}).`);
+      } else {
+        const { error } = await supabase.from('users').insert(userPayload);
+        if (error) console.error(`  ⚠️  User (${userPayload.email}) insert error:`, error.message);
+        else console.log(`  ✅ Inserted user ${userPayload.name} (${userPayload.email}).`);
+      }
+    }
   }
 
   // 3. Migrate Donors (Live + Test)

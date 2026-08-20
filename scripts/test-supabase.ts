@@ -54,7 +54,7 @@ async function testConnection() {
   console.log('2. Connecting to Supabase Cloud...');
   const supabase = createClient(supabaseUrl, keyToUse, {
     auth: { persistSession: false, autoRefreshToken: false },
-    realtime: { transport: ws },
+    realtime: { transport: ws as any },
   });
 
   console.log('3. Verifying Database Tables:');
