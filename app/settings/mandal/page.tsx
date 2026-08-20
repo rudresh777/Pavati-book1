@@ -11,6 +11,8 @@ import {
   Languages,
   ToggleLeft,
   ToggleRight,
+  ExternalLink,
+  MessageCircle,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
@@ -20,6 +22,7 @@ import { cn } from '@/lib/utils/cn';
 
 export default function MandalSettingsPage() {
   const { language, setLanguage, t } = useLanguage();
+  const isEn = language === 'en';
 
   const [settings, setSettings] = useState<MandalSettings | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -33,9 +36,9 @@ export default function MandalSettingsPage() {
       .then((data) => {
         if (data.settings) setSettings(data.settings);
       })
-      .catch((err) => setError('सेटिंग्ज लोड करण्यात अडचण आली.'))
+      .catch(() => setError(isEn ? 'Failed to load settings.' : 'सेटिंग्ज लोड करण्यात अडचण आली.'))
       .finally(() => setIsLoading(false));
-  }, []);
+  }, [isEn]);
 
   const handleToggleDesignation = (id: string) => {
     if (!settings) return;
@@ -57,7 +60,7 @@ export default function MandalSettingsPage() {
     if (!settings) return;
     const newDesig: MandalDesignation = {
       id: `desig-${Date.now()}`,
-      titleMarathi: 'पदाधिकारी',
+      titleMarathi: isEn ? 'Member' : 'पदाधिकारी',
       titleEnglish: 'Member',
       name: '',
       enabled: true,
@@ -89,12 +92,12 @@ export default function MandalSettingsPage() {
       });
 
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'सेटिंग्ज सेव्ह करण्यात अडचण आली.');
+      if (!res.ok) throw new Error(data.error || (isEn ? 'Failed to save settings.' : 'सेटिंग्ज सेव्ह करण्यात अडचण आली.'));
 
       setSaveSuccess(true);
       setTimeout(() => setSaveSuccess(false), 3000);
     } catch (err: any) {
-      setError(err.message || 'काहीतरी त्रुटी आली.');
+      setError(err.message || (isEn ? 'Something went wrong.' : 'काहीतरी त्रुटी आली.'));
     } finally {
       setIsSaving(false);
     }
@@ -136,7 +139,11 @@ export default function MandalSettingsPage() {
       {saveSuccess && (
         <div className="p-4 bg-emerald-50 border border-emerald-300 rounded-xl text-xs text-emerald-800 font-bold flex items-center gap-2 animate-in fade-in">
           <CheckCircle className="w-4 h-4 text-emerald-600 flex-shrink-0" />
-          <span>मंडळ सेटिंग्ज यशस्वीरीत्या जतन करण्यात आल्या!</span>
+          <span>
+            {isEn
+              ? 'Mandal settings successfully saved!'
+              : 'मंडळ सेटिंग्ज यशस्वीरीत्या जतन करण्यात आल्या!'}
+          </span>
         </div>
       )}
 
@@ -170,7 +177,7 @@ export default function MandalSettingsPage() {
                   : 'bg-white text-stone-700 border-stone-200 hover:border-orange-300'
               )}
             >
-              🚩 मराठी (Marathi)
+              मराठी
             </button>
             <button
               type="button"
@@ -182,7 +189,7 @@ export default function MandalSettingsPage() {
                   : 'bg-white text-stone-700 border-stone-200 hover:border-orange-300'
               )}
             >
-              🌐 English (इंग्रजी)
+              English
             </button>
           </div>
         </CardContent>
@@ -192,14 +199,14 @@ export default function MandalSettingsPage() {
       <Card className="border-amber-200 shadow-sm">
         <CardHeader className="bg-amber-50/50">
           <CardTitle className="text-sm font-bold text-amber-950 font-devanagari">
-            १. मंडळाचे मूळ नाव व माहिती (Basic Mandal Info)
+            {isEn ? '1. Basic Mandal Information' : '१. मंडळाची मूळ माहिती'}
           </CardTitle>
         </CardHeader>
         <CardContent className="p-6 space-y-4">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-1">
               <label className="block text-xs font-bold text-stone-700 font-devanagari">
-                मंडळाचे नाव (मराठी) *
+                {isEn ? 'Mandal Name (Marathi) *' : 'मंडळाचे नाव (मराठी) *'}
               </label>
               <input
                 type="text"
@@ -214,7 +221,7 @@ export default function MandalSettingsPage() {
 
             <div className="space-y-1">
               <label className="block text-xs font-bold text-stone-700 font-devanagari">
-                मंडळाचे नाव (English)
+                {isEn ? 'Mandal Name (English)' : 'मंडळाचे नाव (इंग्रजी)'}
               </label>
               <input
                 type="text"
@@ -230,7 +237,7 @@ export default function MandalSettingsPage() {
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div className="space-y-1">
               <label className="block text-xs font-bold text-stone-700 font-devanagari">
-                उत्सव वर्ष (Year)
+                {isEn ? 'Festival Year' : 'उत्सव वर्ष'}
               </label>
               <input
                 type="text"
@@ -243,7 +250,7 @@ export default function MandalSettingsPage() {
 
             <div className="space-y-1">
               <label className="block text-xs font-bold text-stone-700 font-devanagari">
-                नोंदणी क्रमांक (Reg. No. - Optional)
+                {isEn ? 'Registration Number' : 'नोंदणी क्रमांक'}
               </label>
               <input
                 type="text"
@@ -256,7 +263,7 @@ export default function MandalSettingsPage() {
 
             <div className="space-y-1">
               <label className="block text-xs font-bold text-stone-700 font-devanagari">
-                स्थान / शहर (Location)
+                {isEn ? 'Location / City' : 'स्थान / शहर'}
               </label>
               <input
                 type="text"
@@ -272,7 +279,7 @@ export default function MandalSettingsPage() {
 
           <div className="space-y-1">
             <label className="block text-xs font-bold text-stone-700 font-devanagari">
-              मंडळाचा पूर्ण पत्ता (Address)
+              {isEn ? 'Mandal Address' : 'मंडळाचा पत्ता'}
             </label>
             <input
               type="text"
@@ -290,15 +297,23 @@ export default function MandalSettingsPage() {
       {/* 2. CONTACT & WHATSAPP GROUP */}
       <Card className="border-amber-200 shadow-sm">
         <CardHeader className="bg-amber-50/50">
-          <CardTitle className="text-sm font-bold text-amber-950 font-devanagari">
-            २. संपर्क व WhatsApp ग्रुप लिंक
-          </CardTitle>
+          <div className="flex items-center gap-2">
+            <MessageCircle className="w-4 h-4 text-emerald-600" />
+            <CardTitle className="text-sm font-bold text-amber-950 font-devanagari">
+              {isEn ? '2. Contact and WhatsApp Group Invite Link' : '२. संपर्क व WhatsApp ग्रुप आमंत्रण लिंक'}
+            </CardTitle>
+          </div>
+          <CardDescription className="text-xs text-stone-500 font-devanagari">
+            {isEn
+              ? 'Configure official Mandal contact numbers and WhatsApp group invitation link.'
+              : 'मंडळाचे अधिकृत संपर्क क्रमांक आणि ग्रुप आमंत्रण लिंक येथे नोंदवा.'}
+          </CardDescription>
         </CardHeader>
         <CardContent className="p-6 space-y-4">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-1">
               <label className="block text-xs font-bold text-stone-700 font-devanagari">
-                मुख्य संपर्क क्रमांक (Contact Number)
+                {isEn ? 'Primary Contact Number' : 'मुख्य संपर्क क्रमांक'}
               </label>
               <input
                 type="text"
@@ -306,13 +321,14 @@ export default function MandalSettingsPage() {
                 onChange={(e) =>
                   setSettings({ ...settings, contactNumber: e.target.value })
                 }
+                placeholder="9876543210"
                 className="w-full px-3.5 py-2.5 bg-white border border-stone-300 rounded-lg text-sm text-stone-900 font-mono focus:ring-2 focus:ring-orange-500"
               />
             </div>
 
             <div className="space-y-1">
               <label className="block text-xs font-bold text-stone-700 font-devanagari">
-                पर्यायी संपर्क क्रमांक (Alternate Contact)
+                {isEn ? 'Alternate Contact Number' : 'पर्यायी संपर्क क्रमांक'}
               </label>
               <input
                 type="text"
@@ -320,24 +336,43 @@ export default function MandalSettingsPage() {
                 onChange={(e) =>
                   setSettings({ ...settings, alternateContact: e.target.value })
                 }
+                placeholder="9123456789"
                 className="w-full px-3.5 py-2.5 bg-white border border-stone-300 rounded-lg text-sm text-stone-900 font-mono focus:ring-2 focus:ring-orange-500"
               />
             </div>
           </div>
 
-          <div className="space-y-1">
-            <label className="block text-xs font-bold text-stone-700 font-devanagari">
-              मंडळ अधिकृत WhatsApp ग्रुप लिंक (Group Invite Link)
-            </label>
+          <div className="space-y-1.5 pt-2 border-t border-amber-100">
+            <div className="flex items-center justify-between">
+              <label className="block text-xs font-bold text-stone-700 font-devanagari">
+                {isEn ? 'WhatsApp Group Invite Link' : 'मंडळ अधिकृत WhatsApp ग्रुप लिंक'}
+              </label>
+              {settings.whatsappGroupLink && (
+                <a
+                  href={settings.whatsappGroupLink}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-xs font-bold text-emerald-700 hover:text-emerald-800 flex items-center gap-1 hover:underline font-devanagari bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200"
+                >
+                  <span>{isEn ? 'Test Link' : 'लिंक तपासा'}</span>
+                  <ExternalLink className="w-3 h-3" />
+                </a>
+              )}
+            </div>
             <input
               type="url"
               value={settings.whatsappGroupLink}
               onChange={(e) =>
                 setSettings({ ...settings, whatsappGroupLink: e.target.value })
               }
-              placeholder="https://chat.whatsapp.com/..."
+              placeholder="https://chat.whatsapp.com/XXXXXXXX"
               className="w-full px-3.5 py-2.5 bg-white border border-stone-300 rounded-lg text-sm text-stone-900 font-mono focus:ring-2 focus:ring-orange-500"
             />
+            <p className="text-[11px] text-stone-500 font-devanagari leading-relaxed">
+              {isEn
+                ? 'Example: https://chat.whatsapp.com/XXXXXXXX — Donors can click this link to voluntarily join the WhatsApp group after receipt generation.'
+                : 'उदा. https://chat.whatsapp.com/XXXXXXXX — पावती तयार झाल्यानंतर भाविक या लिंकवरून स्वेच्छेने ग्रुपमध्ये सामील होऊ शकतात.'}
+            </p>
           </div>
         </CardContent>
       </Card>
@@ -347,10 +382,12 @@ export default function MandalSettingsPage() {
         <CardHeader className="bg-amber-50/50 flex flex-row items-center justify-between">
           <div>
             <CardTitle className="text-sm font-bold text-amber-950 font-devanagari">
-              ३. पावतीवरील पदाधिकारी नावे व टॉगल (Designations on Pavti)
+              {isEn ? '3. Committee Designations on Receipt' : '३. पावतीवरील पदाधिकारी नावे'}
             </CardTitle>
             <CardDescription className="text-xs text-stone-500 font-devanagari">
-              ज्या पदाधिकाऱ्यांचे नाव पावतीवर दाखवायचे आहे ते सुरू (ON) ठेवा. नको असल्यास बंद (OFF) करा.
+              {isEn
+                ? 'Toggle ON the designations you want to display on the receipt.'
+                : 'ज्या पदाधिकाऱ्यांचे नाव पावतीवर दाखवायचे आहे ते सुरू ठेवा.'}
             </CardDescription>
           </div>
 
@@ -362,7 +399,7 @@ export default function MandalSettingsPage() {
             className="font-devanagari flex items-center gap-1 text-xs"
           >
             <Plus className="w-3.5 h-3.5" />
-            <span>+ नवीन पद जोडा</span>
+            <span>{isEn ? '+ Add Designation' : '+ नवीन पद जोडा'}</span>
           </Button>
         </CardHeader>
 
@@ -385,12 +422,12 @@ export default function MandalSettingsPage() {
                   {desig.enabled ? (
                     <>
                       <ToggleRight className="w-5 h-5 text-emerald-700" />
-                      <span>सुरू (ON)</span>
+                      <span>{isEn ? 'ON' : 'सुरू'}</span>
                     </>
                   ) : (
                     <>
                       <ToggleLeft className="w-5 h-5 text-stone-500" />
-                      <span>बंद (OFF)</span>
+                      <span>{isEn ? 'OFF' : 'बंद'}</span>
                     </>
                   )}
                 </button>
@@ -402,7 +439,7 @@ export default function MandalSettingsPage() {
                     onChange={(e) =>
                       handleUpdateDesignation(desig.id, 'titleMarathi', e.target.value)
                     }
-                    placeholder="उदा. अध्यक्ष / सचिव"
+                    placeholder={isEn ? 'Designation' : 'उदा. अध्यक्ष'}
                     className="px-3 py-1.5 bg-white border border-stone-300 rounded-lg text-xs font-devanagari font-bold"
                   />
 
@@ -412,7 +449,7 @@ export default function MandalSettingsPage() {
                     onChange={(e) =>
                       handleUpdateDesignation(desig.id, 'name', e.target.value)
                     }
-                    placeholder="उदा. श्री. रमेश पाटील"
+                    placeholder={isEn ? 'Name' : 'उदा. रमेश पाटील'}
                     className="px-3 py-1.5 bg-white border border-stone-300 rounded-lg text-xs font-devanagari"
                   />
                 </div>
@@ -434,14 +471,14 @@ export default function MandalSettingsPage() {
       <Card className="border-amber-200 shadow-sm">
         <CardHeader className="bg-amber-50/50">
           <CardTitle className="text-sm font-bold text-amber-950 font-devanagari">
-            ४. पावती अनुक्रमांक सेटिंग्ज (Receipt Numbering)
+            {isEn ? '4. Receipt Numbering Settings' : '४. पावती अनुक्रमांक सेटिंग्ज'}
           </CardTitle>
         </CardHeader>
         <CardContent className="p-6 space-y-4">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-1">
               <label className="block text-xs font-bold text-stone-700 font-devanagari">
-                पावती उपसर्ग (Receipt Prefix - Optional)
+                {isEn ? 'Receipt Prefix' : 'पावती उपसर्ग'}
               </label>
               <input
                 type="text"
@@ -449,14 +486,14 @@ export default function MandalSettingsPage() {
                 onChange={(e) =>
                   setSettings({ ...settings, receiptPrefix: e.target.value })
                 }
-                placeholder="उदा. GPB- किंवा रिक्त ठेवा"
+                placeholder={isEn ? 'e.g. GPB- or leave blank' : 'उदा. GPB- किंवा रिक्त ठेवा'}
                 className="w-full px-3.5 py-2.5 bg-white border border-stone-300 rounded-lg text-sm text-stone-900 font-mono focus:ring-2 focus:ring-orange-500"
               />
             </div>
 
             <div className="space-y-1">
               <label className="block text-xs font-bold text-stone-700 font-devanagari">
-                सुरुवातीचा पावती क्रमांक (Starting Number)
+                {isEn ? 'Starting Receipt Number' : 'सुरुवातीचा पावती क्रमांक'}
               </label>
               <input
                 type="number"

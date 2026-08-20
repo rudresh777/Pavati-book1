@@ -1,5 +1,6 @@
 import {
   User,
+  UserRole,
   MandalSettings,
   Donor,
   Payment,
@@ -146,6 +147,14 @@ export class GoogleStorageProvider implements IStorageProvider {
 
   async cancelPendingPayment(paymentId: string, mode: AppMode): Promise<Payment> {
     return this.fallbackProvider.cancelPendingPayment(paymentId, mode);
+  }
+
+  async deletePayment(
+    id: string,
+    mode: AppMode,
+    user?: { userId: string; userName: string; userRole: UserRole }
+  ): Promise<{ success: boolean; deletedPayment: Payment }> {
+    return this.fallbackProvider.deletePayment(id, mode, user);
   }
 
   async markPaymentAsPaid(

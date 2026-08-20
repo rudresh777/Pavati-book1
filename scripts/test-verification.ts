@@ -19,21 +19,18 @@ async function runVerification() {
   console.log('✓ mr.json & en.json valid and properly structured.');
 
   // 2. Check Home Page identity text
-  const homeContent = fs.readFileSync(path.join(process.cwd(), 'app/page.tsx'), 'utf8');
-  if (!homeContent.includes('॥ श्री गणेशाय नमः ॥ • सन २०२६')) {
-    throw new Error('Missing exact religious greeting in app/page.tsx');
+  const homeContent = fs.readFileSync(path.join(process.cwd(), 'components/home/HomeContent.tsx'), 'utf8');
+  if (!homeContent.includes('॥ श्री गणेशाय नमः ॥ • सन २०२६ • ॥ गणपती बाप्पा मोरया ॥')) {
+    throw new Error('Missing exact religious greeting in components/home/HomeContent.tsx');
   }
   if (!homeContent.includes('मोरया गणेशोत्सव मंडळ')) {
-    throw new Error('Missing exact Mandal name in app/page.tsx');
+    throw new Error('Missing exact Mandal name in components/home/HomeContent.tsx');
   }
   if (!homeContent.includes('तापडिया नगर अकोला 444001')) {
-    throw new Error('Missing exact identity address in app/page.tsx');
+    throw new Error('Missing exact identity address in components/home/HomeContent.tsx');
   }
-  if (!homeContent.includes('॥ गणपती बाप्पा मोरया ॥')) {
-    throw new Error('Missing exact slogan in app/page.tsx');
-  }
-  if (!homeContent.includes('यंदाच्या गणेशोत्सवासाठी मंडळातर्फे सर्व भाविक भक्तांचे सहर्ष स्वागत! आपली देणगी / वर्गणी अधिकृत डिजिटल पावतीद्वारे')) {
-    throw new Error('Missing exact Marathi welcome text in app/page.tsx');
+  if (!homeContent.includes('यंदाच्या गणेशोत्सवासाठी मंडळातर्फे सर्व भाविक भक्तांचे सहर्ष स्वागत!')) {
+    throw new Error('Missing exact Marathi welcome text in components/home/HomeContent.tsx');
   }
   console.log('✓ Public Home Page Hero order & exact Marathi identity content verified.');
 

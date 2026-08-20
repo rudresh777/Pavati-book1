@@ -427,8 +427,8 @@ export class LocalStorageProvider implements IStorageProvider {
       scope.payments.push(updatedPayment);
     }
 
-    // Update receiptCounter if this is a PAID payment with a numeric receipt number
-    if (updatedPayment.status === 'PAID' && updatedPayment.numericReceiptNumber) {
+    // Update receiptCounter if numeric receipt number is present
+    if (updatedPayment.numericReceiptNumber) {
       scope.receiptCounter = Math.max(scope.receiptCounter || 0, updatedPayment.numericReceiptNumber);
       (scope as any).lastReceiptNumber = scope.receiptCounter;
     }
@@ -441,8 +441,8 @@ export class LocalStorageProvider implements IStorageProvider {
     
     const pavtiRecord: Pavti = {
       id: existingPavtiIndex >= 0 ? scope.pavtis[existingPavtiIndex].id : `pavti-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
-      receiptNumber: isDue ? '' : (updatedPayment.receiptNumber || ''),
-      numericReceiptNumber: isDue ? undefined : updatedPayment.numericReceiptNumber,
+      receiptNumber: updatedPayment.receiptNumber || '',
+      numericReceiptNumber: updatedPayment.numericReceiptNumber,
       paymentId: updatedPayment.id,
       donorId: updatedPayment.donorId,
       donorName: updatedPayment.donorName,
@@ -533,6 +533,18 @@ export class LocalStorageProvider implements IStorageProvider {
       }
     }
 
+    // Sync Pavti record
+    const pavtiIndex = scope.pavtis.findIndex((p) => p.paymentId === payment.id);
+    if (pavtiIndex >= 0) {
+      scope.pavtis[pavtiIndex].donorName = payment.donorName;
+      scope.pavtis[pavtiIndex].donorMobile = payment.donorMobile;
+      scope.pavtis[pavtiIndex].donorAddress = payment.donorAddress;
+      scope.pavtis[pavtiIndex].amount = payment.expectedAmount;
+      scope.pavtis[pavtiIndex].amountInWordsMarathi = numberToWordsMarathi(payment.expectedAmount);
+      scope.pavtis[pavtiIndex].amountInWordsEnglish = numberToWordsEnglish(payment.expectedAmount);
+      if (data.date) scope.pavtis[pavtiIndex].date = data.date;
+    }
+
     await this.writeDb(db);
     return payment;
   }
@@ -566,6 +578,62 @@ export class LocalStorageProvider implements IStorageProvider {
     return payment;
   }
 
+  async deletePayment(
+    id: string,
+    mode: AppMode,
+    user?: { userId: string; userName: string; userRole: UserRole }
+  ): Promise<{ success: boolean; deletedPayment: Payment }> {
+    const db = await this.readDb();
+    const scope = mode === 'LIVE' ? db.liveData : db.testData;
+    const paymentIndex = scope.payments.findIndex((p) => p.id === id);
+    if (paymentIndex === -1) {
+      throw new Error('पावती / देणगी नोंद सापडली नाही.');
+    }
+
+    const deletedPayment = scope.payments[paymentIndex];
+    scope.payments.splice(paymentIndex, 1);
+
+    // Also delete associated Pavti
+    scope.pavtis = scope.pavtis.filter(
+      (pav) =>
+        pav.paymentId !== id &&
+        (!deletedPayment.receiptNumber || pav.receiptNumber !== deletedPayment.receiptNumber)
+    );
+
+    // Update Donor summary stats if donorId is linked
+    if (deletedPayment.donorId) {
+      const donorIndex = scope.donors.findIndex((d) => d.id === deletedPayment.donorId);
+      if (donorIndex >= 0) {
+        const remainingPaid = scope.payments.filter(
+          (p) => p.donorId === deletedPayment.donorId && p.status === 'PAID'
+        );
+        scope.donors[donorIndex].totalContributed = remainingPaid.reduce(
+          (sum, p) => sum + p.receivedAmount,
+          0
+        );
+        scope.donors[donorIndex].pavtiCount = remainingPaid.length;
+        scope.donors[donorIndex].updatedAt = new Date().toISOString();
+      }
+    }
+
+    // Add Audit Log
+    scope.auditLogs.push({
+      id: `audit-${Date.now()}`,
+      userId: user?.userId || 'system',
+      userName: user?.userName || 'Admin',
+      userRole: user?.userRole || 'HOST',
+      action: 'PAYMENT_DELETED',
+      entityType: 'PAYMENT',
+      entityId: id,
+      details: `Payment #${deletedPayment.receiptNumber || id} for ${deletedPayment.donorName} (₹${deletedPayment.receivedAmount || deletedPayment.expectedAmount}) was permanently deleted.`,
+      mode,
+      timestamp: new Date().toISOString(),
+    });
+
+    await this.writeDb(db);
+    return { success: true, deletedPayment };
+  }
+
   async markPaymentAsPaid(
     paymentId: string,
     paymentDetails: {
@@ -587,10 +655,19 @@ export class LocalStorageProvider implements IStorageProvider {
       throw new Error(`Payment with ID ${paymentId} not found.`);
     }
 
-    // Assign next atomic receipt number using global max check
-    const { formatted: formattedReceiptNumber, numeric: nextNumber } = await this.getNextReceiptNumber(mode);
-    scope.receiptCounter = nextNumber;
-    (scope as any).lastReceiptNumber = nextNumber;
+    // CRITICAL: Retain the EXACT SAME receipt number already assigned to this receipt.
+    // Do NOT generate a new receipt number when paying an existing Due receipt.
+    let formattedReceiptNumber = payment.receiptNumber;
+    let nextNumber = payment.numericReceiptNumber;
+
+    if (!formattedReceiptNumber) {
+      // Legacy fallback only
+      const nextObj = await this.getNextReceiptNumber(mode);
+      formattedReceiptNumber = nextObj.formatted;
+      nextNumber = nextObj.numeric;
+      scope.receiptCounter = Math.max(scope.receiptCounter || 0, nextNumber);
+      (scope as any).lastReceiptNumber = scope.receiptCounter;
+    }
 
     // Update payment record
     payment.status = 'PAID';
@@ -610,12 +687,17 @@ export class LocalStorageProvider implements IStorageProvider {
     payment.date = paymentDetails.paymentDate || new Date().toISOString().split('T')[0];
     payment.updatedAt = new Date().toISOString();
 
-    // Update or Generate Pavti Record (Do NOT create duplicate Pavti)
+    // Update or Generate Pavti Record with SAME receipt number
     const existingPavtiIndex = scope.pavtis.findIndex(
-      (p) => p.paymentId === payment.id || (payment.receiptNumber && p.receiptNumber === payment.receiptNumber)
+      (p) =>
+        p.paymentId === payment.id ||
+        (payment.receiptNumber && p.receiptNumber === payment.receiptNumber)
     );
     const pavti: Pavti = {
-      id: existingPavtiIndex >= 0 ? scope.pavtis[existingPavtiIndex].id : `pavti-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+      id:
+        existingPavtiIndex >= 0
+          ? scope.pavtis[existingPavtiIndex].id
+          : `pavti-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
       receiptNumber: formattedReceiptNumber,
       numericReceiptNumber: nextNumber,
       paymentId: payment.id,
@@ -660,7 +742,7 @@ export class LocalStorageProvider implements IStorageProvider {
       action: 'PAYMENT_MARKED_PAID',
       entityType: 'PAYMENT',
       entityId: payment.id,
-      details: `Payment marked PAID for ${payment.donorName}. Pavti #${formattedReceiptNumber} (₹${payment.receivedAmount}) generated.`,
+      details: `Payment marked PAID for ${payment.donorName}. Pavti #${formattedReceiptNumber} (₹${payment.receivedAmount}, ${paymentDetails.paymentMethod}) updated.`,
       mode,
       timestamp: new Date().toISOString(),
     });
@@ -925,8 +1007,8 @@ export class LocalStorageProvider implements IStorageProvider {
     if (user.userRole !== 'SUPER_ADMIN') {
       throw new Error('अनधिकृत: फक्त सुपर ॲडमिन संपूर्ण डेटा रीसेट करू शकतात.');
     }
-    if (confirmation !== 'RESET') {
-      throw new Error('अवैध पुष्टीकरण: कृपया अचूक "RESET" टाईप करा.');
+    if (confirmation !== 'RESET' && confirmation !== 'DELETE ALL DATA') {
+      throw new Error('अवैध पुष्टीकरण: कृपया अचूक "DELETE ALL DATA" टाईप करा.');
     }
 
     const db = await this.readDb();

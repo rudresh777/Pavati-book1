@@ -8,10 +8,13 @@ import {
   Download,
   Eye,
   Share2,
+  Trash2,
+  AlertTriangle,
   PlusCircle,
 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
+import { Modal } from '@/components/ui/Modal';
 import { useAppMode } from '@/lib/context/mode-context';
 import { useLanguage } from '@/lib/context/language-context';
 import { Payment, Pavti, MandalSettings } from '@/types';
@@ -21,7 +24,8 @@ import { PavtiShareModal } from '@/components/pavti/PavtiShareModal';
 
 export default function PaymentsLedgerPage() {
   const { mode } = useAppMode();
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
+  const isEn = language === 'en';
 
   const [payments, setPayments] = useState<Payment[]>([]);
   const [settings, setSettings] = useState<MandalSettings | null>(null);
@@ -33,6 +37,10 @@ export default function PaymentsLedgerPage() {
   // Pavti Share state
   const [selectedPavti, setSelectedPavti] = useState<Pavti | null>(null);
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
+
+  // Delete Individual Record state
+  const [deletePaymentTarget, setDeletePaymentTarget] = useState<Payment | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const fetchPayments = async () => {
     setIsLoading(true);
@@ -65,9 +73,31 @@ export default function PaymentsLedgerPage() {
       if (pavti) {
         setSelectedPavti(pavti);
         setIsShareModalOpen(true);
+      } else {
+        alert(isEn ? 'Receipt not found.' : 'पावती सापडली नाही.');
       }
     } catch (err) {
       console.error('Failed to load pavti for share:', err);
+    }
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!deletePaymentTarget || isDeleting) return;
+    setIsDeleting(true);
+    try {
+      const res = await fetch(`/api/payments/${deletePaymentTarget.id}?mode=${mode}`, {
+        method: 'DELETE',
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || (isEn ? 'Failed to delete record.' : 'नोंद हटवण्यात त्रुटी आली.'));
+      }
+      setDeletePaymentTarget(null);
+      fetchPayments();
+    } catch (err: any) {
+      alert(err.message || (isEn ? 'Error occurred.' : 'त्रुटी आली.'));
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -95,7 +125,7 @@ export default function PaymentsLedgerPage() {
   // Export filtered ledger to CSV
   const handleExportCSV = () => {
     const headers = [
-      'Pavti_No',
+      'Receipt_No',
       'Date',
       'Donor_Name',
       'Mobile',
@@ -116,7 +146,7 @@ export default function PaymentsLedgerPage() {
       p.receivedAmount || 0,
       p.expectedAmount || 0,
       p.status,
-      p.paymentMethod,
+      p.status === 'DUE' || p.status === 'PENDING' ? 'DUE' : p.paymentMethod,
       p.transactionReference || '',
       `"${(p.hostName || '').replace(/"/g, '""')}"`,
       `"${(p.notes || '').replace(/"/g, '""')}"`,
@@ -196,6 +226,7 @@ export default function PaymentsLedgerPage() {
             >
               <option value="ALL">{t('ledger.allStatus')}</option>
               <option value="PAID">{t('ledger.paidOnly')}</option>
+              <option value="DUE">{isEn ? 'Due Only' : 'फक्त बाकी'}</option>
               <option value="PENDING">{t('ledger.pendingOnly')}</option>
               <option value="CANCELLED">{t('ledger.cancelledOnly')}</option>
             </select>
@@ -209,8 +240,9 @@ export default function PaymentsLedgerPage() {
               className="w-full px-3 py-2 bg-stone-50 border border-stone-300 rounded-lg text-xs text-stone-800 font-devanagari focus:outline-none focus:ring-2 focus:ring-orange-500"
             >
               <option value="ALL">{t('ledger.allMethods')}</option>
-              <option value="CASH">{t('ledger.cashOnly')}</option>
-              <option value="UPI">{t('ledger.upiOnly')}</option>
+              <option value="CASH">{isEn ? 'Cash Only' : 'फक्त रोख'}</option>
+              <option value="UPI">{isEn ? 'UPI Only' : 'फक्त यूपीआय'}</option>
+              <option value="DUE">{isEn ? 'Due Only' : 'फक्त बाकी'}</option>
             </select>
           </div>
         </div>
@@ -229,109 +261,184 @@ export default function PaymentsLedgerPage() {
       {/* Ledger Table */}
       <div className="bg-white rounded-xl border border-stone-200 overflow-hidden shadow-sm">
         <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs text-stone-700">
+          <table className="w-full text-left text-xs text-stone-700 min-w-[760px]">
             <thead className="bg-stone-50 text-stone-600 font-bold border-b border-stone-200 uppercase font-devanagari">
               <tr>
-                <th className="px-4 py-3">पावती क्र.</th>
-                <th className="px-4 py-3">दिनांक</th>
-                <th className="px-4 py-3">देणगीदार</th>
-                <th className="px-4 py-3">रक्कम</th>
-                <th className="px-4 py-3">स्थिती</th>
-                <th className="px-4 py-3">माध्यम</th>
-                <th className="px-4 py-3">प्रतिनिधी (Host)</th>
-                <th className="px-4 py-3 text-right">कृती</th>
+                <th className="px-4 py-3">{isEn ? 'Receipt #' : 'पावती क्र.'}</th>
+                <th className="px-4 py-3">{isEn ? 'Date' : 'दिनांक'}</th>
+                <th className="px-4 py-3">{isEn ? 'Donor Name' : 'देणगीदाराचे नाव'}</th>
+                <th className="px-4 py-3">{isEn ? 'Amount' : 'रक्कम'}</th>
+                <th className="px-4 py-3">{isEn ? 'Status' : 'स्थिती'}</th>
+                <th className="px-4 py-3">{isEn ? 'Payment Mode' : 'माध्यम'}</th>
+                <th className="px-4 py-3">{isEn ? 'Representative' : 'प्रतिनिधी'}</th>
+                <th className="px-4 py-3 text-right">{isEn ? 'Actions' : 'कृती'}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-stone-100">
               {filteredPayments.length === 0 ? (
                 <tr>
                   <td colSpan={8} className="text-center py-10 text-stone-400 font-devanagari">
-                    कोणतीही नोंद आढळली नाही.
+                    {isEn ? 'No records found.' : 'कोणतीही नोंद आढळली नाही.'}
                   </td>
                 </tr>
               ) : (
-                filteredPayments.map((p) => (
-                  <tr key={p.id} className="hover:bg-amber-50/40 transition-colors">
-                    <td className="px-4 py-3 font-mono font-bold text-orange-800">
-                      {p.receiptNumber ? `#${p.receiptNumber}` : '-'}
-                    </td>
-                    <td className="px-4 py-3 text-stone-500 font-mono">{p.date}</td>
-                    <td className="px-4 py-3">
-                      <div className="font-bold text-stone-900 font-devanagari">{p.donorName}</div>
-                      {p.donorMobile && (
-                        <div className="text-[11px] text-stone-500 font-mono">{p.donorMobile}</div>
-                      )}
-                    </td>
-                    <td className="px-4 py-3 font-bold text-stone-900 font-mono text-sm">
-                      {formatIndianCurrency(p.receivedAmount || p.expectedAmount)}
-                    </td>
-                    <td className="px-4 py-3">
-                      <Badge
-                        variant={
-                          p.status === 'PAID'
-                            ? 'success'
-                            : (p.status === 'DUE' || p.status === 'PENDING')
-                            ? 'warning'
-                            : 'danger'
-                        }
-                      >
-                        {p.status === 'PAID'
-                          ? t('common.status.paid')
-                          : (p.status === 'DUE' || p.status === 'PENDING')
-                          ? 'बाकी (Due)'
-                          : t('common.status.cancelled')}
-                      </Badge>
-                    </td>
-                    <td className="px-4 py-3">
-                      {p.status === 'DUE' || p.status === 'PENDING' ? (
-                        <span className="px-2 py-0.5 bg-amber-100 text-amber-900 border border-amber-300 rounded font-semibold text-[11px] font-devanagari">
-                          बाकी / DUE
-                        </span>
-                      ) : (
-                        <div className="font-devanagari font-semibold text-stone-800">
-                          {p.paymentMethod === 'CASH' ? t('dashboard.cash') : 'UPI'}
-                          {p.transactionReference && (
-                            <div className="text-[10px] text-stone-400 font-mono">
-                              Ref: {p.transactionReference}
-                            </div>
-                          )}
-                        </div>
-                      )}
-                    </td>
-                    <td className="px-4 py-3 text-stone-600 font-devanagari">{p.hostName}</td>
-                    <td className="px-4 py-3 text-right">
-                      {p.status === 'PAID' ? (
-                        <div className="flex items-center justify-end gap-1.5">
+                filteredPayments.map((p) => {
+                  const isDue = p.status === 'DUE' || p.status === 'PENDING' || p.paymentMethod === 'DUE';
+                  return (
+                    <tr key={p.id} className="hover:bg-amber-50/40 transition-colors">
+                      {/* 1. Receipt No */}
+                      <td className="px-4 py-3 font-mono font-bold text-orange-800 whitespace-nowrap">
+                        {p.receiptNumber ? `#${p.receiptNumber}` : '-'}
+                      </td>
+
+                      {/* 2. Date */}
+                      <td className="px-4 py-3 text-stone-500 font-mono whitespace-nowrap">{p.date}</td>
+
+                      {/* 3. Donor Name */}
+                      <td className="px-4 py-3">
+                        <div className="font-bold text-stone-900 font-devanagari">{p.donorName}</div>
+                        {p.donorMobile && (
+                          <div className="text-[11px] text-stone-500 font-mono">{p.donorMobile}</div>
+                        )}
+                      </td>
+
+                      {/* 4. Amount */}
+                      <td className="px-4 py-3 font-bold text-stone-900 font-mono text-sm whitespace-nowrap">
+                        {formatIndianCurrency(isDue ? p.expectedAmount : (p.receivedAmount || p.expectedAmount))}
+                      </td>
+
+                      {/* 5. Status */}
+                      <td className="px-4 py-3 whitespace-nowrap">
+                        <Badge
+                          variant={
+                            p.status === 'PAID'
+                              ? 'success'
+                              : isDue
+                              ? 'warning'
+                              : 'danger'
+                          }
+                        >
+                          {p.status === 'PAID'
+                            ? (isEn ? 'PAID' : 'जमा')
+                            : isDue
+                            ? (isEn ? 'DUE' : 'बाकी')
+                            : (isEn ? 'CANCELLED' : 'रद्द')}
+                        </Badge>
+                      </td>
+
+                      {/* 6. Payment Mode */}
+                      <td className="px-4 py-3 whitespace-nowrap">
+                        {isDue ? (
+                          <span className="px-2 py-0.5 bg-amber-100 text-amber-900 border border-amber-300 rounded font-semibold text-[11px] font-devanagari">
+                            {isEn ? 'Due' : 'बाकी'}
+                          </span>
+                        ) : (
+                          <div className="font-devanagari font-semibold text-stone-800">
+                            {p.paymentMethod === 'CASH' ? (isEn ? 'Cash' : 'रोख') : 'UPI'}
+                            {p.transactionReference && (
+                              <div className="text-[10px] text-stone-400 font-mono">
+                                Ref: {p.transactionReference}
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </td>
+
+                      {/* 7. Host */}
+                      <td className="px-4 py-3 text-stone-600 font-devanagari whitespace-nowrap">{p.hostName || (isEn ? 'Admin' : 'प्रतिनिधी')}</td>
+
+                      {/* 8. Actions: View, Share, Delete */}
+                      <td className="px-4 py-3 text-right whitespace-nowrap">
+                        <div className="flex items-center justify-end gap-1">
+                          {/* View Receipt */}
                           <Link
                             href={`/pavti/${p.receiptNumber || p.id}`}
-                            className="p-1.5 text-stone-600 hover:text-orange-600 rounded hover:bg-stone-100"
-                            title="पावती पहा"
+                            className="p-1.5 text-stone-600 hover:text-orange-600 rounded-lg hover:bg-stone-100 transition-colors"
+                            title={isEn ? 'View Receipt' : 'पावती पहा'}
                           >
                             <Eye className="w-4 h-4" />
                           </Link>
+
+                          {/* Share Receipt */}
                           <button
+                            type="button"
                             onClick={() => handleSharePayment(p.id)}
-                            className="p-1.5 text-emerald-600 hover:text-emerald-700 rounded hover:bg-emerald-50"
-                            title="शेअर करा"
+                            className="p-1.5 text-emerald-600 hover:text-emerald-700 rounded-lg hover:bg-emerald-50 transition-colors cursor-pointer"
+                            title={isEn ? 'Share' : 'शेअर करा'}
                           >
                             <Share2 className="w-4 h-4" />
                           </button>
+
+                          {/* Delete Individual Record */}
+                          <button
+                            type="button"
+                            onClick={() => setDeletePaymentTarget(p)}
+                            className="p-1.5 text-stone-400 hover:text-red-600 rounded-lg hover:bg-red-50 transition-colors cursor-pointer"
+                            title={isEn ? 'Delete Record' : 'नोंद हटवा'}
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
                         </div>
-                      ) : p.status === 'PENDING' ? (
-                        <Link href="/pending">
-                          <span className="text-[11px] font-bold text-orange-600 hover:underline font-devanagari">
-                            {t('dashboard.collectNow')}
-                          </span>
-                        </Link>
-                      ) : null}
-                    </td>
-                  </tr>
-                ))
+                      </td>
+                    </tr>
+                  );
+                })
               )}
             </tbody>
           </table>
         </div>
       </div>
+
+      {/* INDIVIDUAL RECORD DELETE CONFIRMATION MODAL */}
+      {deletePaymentTarget && (
+        <Modal
+          isOpen={!!deletePaymentTarget}
+          onClose={() => setDeletePaymentTarget(null)}
+          title={
+            <div className="flex items-center gap-2 text-red-600 font-devanagari">
+              <AlertTriangle className="w-5 h-5" />
+              <span>{isEn ? 'Delete Record Permanently' : 'नोंद कायमस्वरूपी हटवा'}</span>
+            </div>
+          }
+          description={isEn ? 'Are you sure you want to delete this receipt record permanently? This action cannot be undone.' : 'तुम्हाला खात्री आहे का की तुम्हाला ही पावती / देणगी नोंद कायमस्वरूपी हटवायची आहे? ही कृती पूर्ववत केली जाऊ शकत नाही.'}
+          maxWidth="sm"
+        >
+          <div className="space-y-4 pt-2">
+            <div className="p-3.5 bg-red-50 rounded-xl border border-red-200 text-xs text-red-900 space-y-1 font-devanagari">
+              <div><strong>{isEn ? 'Receipt #:' : 'पावती क्र.:'}</strong> #{deletePaymentTarget.receiptNumber || deletePaymentTarget.id}</div>
+              <div><strong>{isEn ? 'Donor:' : 'देणगीदार:'}</strong> {deletePaymentTarget.donorName}</div>
+              <div>
+                <strong>{isEn ? 'Amount:' : 'रक्कम:'}</strong> ₹
+                {deletePaymentTarget.status === 'DUE'
+                  ? deletePaymentTarget.expectedAmount
+                  : deletePaymentTarget.receivedAmount || deletePaymentTarget.expectedAmount} (
+                {deletePaymentTarget.status === 'DUE' ? (isEn ? 'DUE' : 'बाकी') : (isEn ? 'PAID' : 'जमा')})
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setDeletePaymentTarget(null)}
+              >
+                {t('common.cancel')}
+              </Button>
+              <Button
+                type="button"
+                variant="danger"
+                size="sm"
+                isLoading={isDeleting}
+                onClick={handleConfirmDelete}
+                className="font-devanagari font-bold"
+              >
+                {isEn ? 'Delete Record' : 'होय, नोंद हटवा'}
+              </Button>
+            </div>
+          </div>
+        </Modal>
+      )}
 
       {/* SHARE MODAL IF TRIGGERED */}
       {selectedPavti && settings && (

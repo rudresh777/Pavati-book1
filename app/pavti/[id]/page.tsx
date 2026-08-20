@@ -11,12 +11,16 @@ import {
   ArrowLeft,
   CheckCircle,
   FileCheck,
+  MessageSquare,
+  Users,
+  ExternalLink,
 } from 'lucide-react';
 import { PavtiCard } from '@/components/pavti/PavtiCard';
 import { PavtiShareModal } from '@/components/pavti/PavtiShareModal';
 import { Button } from '@/components/ui/Button';
 import { Pavti, MandalSettings } from '@/types';
 import { useAppMode } from '@/lib/context/mode-context';
+import { useLanguage } from '@/lib/context/language-context';
 
 export default function PavtiDetailPage({
   params,
@@ -26,6 +30,8 @@ export default function PavtiDetailPage({
   const { id } = use(params);
   const router = useRouter();
   const { mode } = useAppMode();
+  const { language, t } = useLanguage();
+  const isEn = language === 'en';
 
   const [pavti, setPavti] = useState<Pavti | null>(null);
   const [settings, setSettings] = useState<MandalSettings | null>(null);
@@ -39,23 +45,23 @@ export default function PavtiDetailPage({
       try {
         const res = await fetch(`/api/pavtis/${id}?mode=${mode}`);
         const data = await res.json();
-        if (!res.ok) throw new Error(data.error || 'पावती सापडली नाही');
+        if (!res.ok) throw new Error(data.error || (isEn ? 'Receipt not found' : 'पावती सापडली नाही'));
 
         setPavti(data.pavti);
         setSettings(data.settings);
       } catch (err: any) {
-        setError(err.message || 'पावती लोड करण्यात त्रुटी आली');
+        setError(err.message || (isEn ? 'Failed to load receipt' : 'पावती लोड करण्यात त्रुटी आली'));
       } finally {
         setIsLoading(false);
       }
     }
     loadPavti();
-  }, [id, mode]);
+  }, [id, mode, isEn]);
 
   if (isLoading) {
     return (
       <div className="text-center py-20 font-devanagari text-stone-600">
-        पावती लोड होत आहे...
+        {t('common.loading')}
       </div>
     );
   }
@@ -64,11 +70,11 @@ export default function PavtiDetailPage({
     return (
       <div className="max-w-md mx-auto text-center py-16 space-y-4">
         <div className="text-red-500 font-bold text-lg font-devanagari">
-          {error || 'पावती सापडली नाही'}
+          {error || (isEn ? 'Receipt not found' : 'पावती सापडली नाही')}
         </div>
         <Link href="/dashboard">
           <Button variant="outline" className="font-devanagari">
-            डॅशबोर्डवर परत जा
+            {isEn ? 'Return to Dashboard' : 'डॅशबोर्डवर परत जा'}
           </Button>
         </Link>
       </div>
@@ -89,7 +95,7 @@ export default function PavtiDetailPage({
           <div>
             <h1 className="text-lg sm:text-xl font-bold font-devanagari text-stone-900 flex items-center gap-2">
               <FileCheck className="w-5 h-5 text-orange-600" />
-              <span>डिजिटल पावती क्र. #{pavti.receiptNumber}</span>
+              <span>{isEn ? `Digital Receipt #${pavti.receiptNumber}` : `डिजिटल पावती क्र. #${pavti.receiptNumber}`}</span>
             </h1>
             <p className="text-xs text-stone-500 font-mono">
               {pavti.donorName} • {pavti.date}
@@ -105,7 +111,7 @@ export default function PavtiDetailPage({
             className="flex items-center gap-1.5 font-devanagari py-2 px-3.5 shadow"
           >
             <Share2 className="w-4 h-4" />
-            <span>शेअर / डाऊनलोड</span>
+            <span>{isEn ? 'Share / Download' : 'शेअर / डाउनलोड'}</span>
           </Button>
 
           <Link href="/pavti/new">
@@ -115,10 +121,46 @@ export default function PavtiDetailPage({
               className="flex items-center gap-1.5 font-devanagari py-2 px-3"
             >
               <PlusCircle className="w-4 h-4 text-orange-600" />
-              <span>नवीन पावती</span>
+              <span>{t('ledger.newPavti')}</span>
             </Button>
           </Link>
         </div>
+      </div>
+
+      {/* QUICK WHATSAPP ACTIONS */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <button
+          type="button"
+          onClick={() => setIsShareModalOpen(true)}
+          className="flex items-center justify-center gap-2 py-3 px-4 bg-emerald-600 hover:bg-emerald-700 active:scale-[0.99] text-white rounded-xl shadow-sm font-devanagari font-bold text-sm transition-all text-center"
+        >
+          <MessageSquare className="w-4 h-4 flex-shrink-0" />
+          <span>
+            {isEn ? 'Share Receipt on WhatsApp' : 'WhatsApp वर पावती पाठवा'}
+          </span>
+        </button>
+
+        {settings?.whatsappGroupLink ? (
+          <a
+            href={settings.whatsappGroupLink}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center justify-center gap-2 py-3 px-4 bg-teal-600 hover:bg-teal-700 active:scale-[0.99] text-white rounded-xl shadow-sm font-devanagari font-bold text-sm transition-all text-center"
+          >
+            <Users className="w-4 h-4 flex-shrink-0" />
+            <span>
+              {isEn ? 'Join Mandal WhatsApp Group' : 'मंडळ WhatsApp ग्रुप जॉईन करा'}
+            </span>
+            <ExternalLink className="w-3.5 h-3.5 opacity-80" />
+          </a>
+        ) : (
+          <div className="flex items-center justify-center gap-2 py-3 px-4 bg-stone-100 border border-stone-200 text-stone-400 rounded-xl font-devanagari text-xs text-center">
+            <Users className="w-4 h-4" />
+            <span>
+              {isEn ? 'No group link configured' : 'ग्रुप लिंक उपलब्ध नाही'}
+            </span>
+          </div>
+        )}
       </div>
 
       {/* PRINTABLE PAVTI CARD CONTAINER */}
@@ -135,7 +177,9 @@ export default function PavtiDetailPage({
         <div className="flex items-center gap-2">
           <CheckCircle className="w-4 h-4 text-emerald-600 flex-shrink-0" />
           <span className="font-devanagari">
-            पावती सुरक्षितपणे जतन करण्यात आली आहे. आपण हवी तेव्हा ही पावती पुन्हा डाऊनलोड किंवा शेअर करू शकता.
+            {isEn
+              ? 'Receipt is securely stored in database. You can download or share anytime.'
+              : 'पावती सुरक्षितपणे जतन करण्यात आली आहे. आपण हवी तेव्हा ही पावती पुन्हा डाउनलोड किंवा शेअर करू शकता.'}
           </span>
         </div>
 
@@ -144,7 +188,7 @@ export default function PavtiDetailPage({
           className="flex items-center gap-1 font-bold text-stone-700 hover:text-stone-900 bg-white px-3 py-1.5 rounded-lg border border-stone-300 shadow-sm"
         >
           <Printer className="w-3.5 h-3.5" />
-          <span>प्रिंट करा</span>
+          <span>{isEn ? 'Print' : 'प्रिंट करा'}</span>
         </button>
       </div>
 

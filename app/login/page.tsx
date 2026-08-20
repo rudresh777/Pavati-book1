@@ -61,15 +61,18 @@ function LoginForm() {
   return (
     <div className="min-h-[80vh] flex items-center justify-center py-10 px-4">
       <div className="w-full max-w-md space-y-6">
-        {/* Header Branding (Mandal identity name remains Marathi) */}
-        <div className="text-center space-y-2">
+        {/* Header Branding (Mandal identity name & address remain in Marathi) */}
+        <div className="text-center space-y-1.5">
           <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-orange-500 to-amber-600 flex items-center justify-center text-white font-devanagari font-black text-3xl shadow-xl mx-auto border-2 border-amber-300">
             ॐ
           </div>
           <h1 className="text-2xl font-black font-devanagari text-stone-900 tracking-tight">
             मोरया गणेशोत्सव मंडळ
           </h1>
-          <p className="text-xs font-semibold text-amber-800 uppercase tracking-wider">
+          <div className="text-xs font-semibold text-amber-900 font-devanagari">
+            तापडिया नगर अकोला 444001
+          </div>
+          <p className="text-[11px] font-semibold text-stone-500 uppercase tracking-wider">
             {t('login.subtitle')}
           </p>
         </div>

@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, Suspense } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import {
   FileCheck,
   User,
@@ -11,10 +12,15 @@ import {
   AlertTriangle,
   ArrowLeft,
   Search,
+  ExternalLink,
+  PlusCircle,
+  X,
+  History,
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { Card, CardContent } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
+import { Modal } from '@/components/ui/Modal';
 import { useAppMode } from '@/lib/context/mode-context';
 import { useLanguage } from '@/lib/context/language-context';
 import { numberToWordsMarathi, numberToWordsEnglish, formatIndianCurrency } from '@/lib/utils/number-to-words';
@@ -28,6 +34,7 @@ function NewPavtiForm() {
   const router = useRouter();
   const { mode } = useAppMode();
   const { language, t } = useLanguage();
+  const isEn = language === 'en';
 
   const [settings, setSettings] = useState<MandalSettings | null>(null);
   const [donorName, setDonorName] = useState('');
@@ -38,9 +45,11 @@ function NewPavtiForm() {
   const [transactionReference, setTransactionReference] = useState('');
   const [notes, setNotes] = useState('');
 
-  // Duplicate Donor Warning state
-  const [existingDonorMatch, setExistingDonorMatch] = useState<Donor | null>(null);
-  const [ignoreDuplicateWarning, setIgnoreDuplicateWarning] = useState(false);
+  // Duplicate Donor Modal & State
+  const [duplicateCheckDonor, setDuplicateCheckDonor] = useState<Donor | null>(null);
+  const [duplicateRecentPavtis, setDuplicateRecentPavtis] = useState<Pavti[]>([]);
+  const [isDuplicateModalOpen, setIsDuplicateModalOpen] = useState(false);
+  const [isConfirmedForExistingDonor, setIsConfirmedForExistingDonor] = useState(false);
 
   // Donor search autocomplete
   const [donorSuggestions, setDonorSuggestions] = useState<Donor[]>([]);
@@ -65,6 +74,31 @@ function NewPavtiForm() {
       .catch(() => {});
   }, []);
 
+  // Check if donor mobile already exists in the system
+  const checkDuplicateDonor = async (mobileNum: string, nameText?: string) => {
+    const cleanMobile = mobileNum.replace(/\D/g, '');
+    if (cleanMobile.length !== 10 && (!nameText || nameText.trim().length < 3)) {
+      return;
+    }
+
+    try {
+      const url = `/api/donors/check?mobile=${encodeURIComponent(cleanMobile)}&name=${encodeURIComponent(nameText || '')}&mode=${mode}`;
+      const res = await fetch(url);
+      const data = await res.json();
+
+      if (data.exists && data.donor) {
+        // If this donor is not already the selected donor and not confirmed
+        if (selectedDonorId !== data.donor.id && !isConfirmedForExistingDonor) {
+          setDuplicateCheckDonor(data.donor);
+          setDuplicateRecentPavtis(data.recentPavtis || []);
+          setIsDuplicateModalOpen(true);
+        }
+      }
+    } catch {
+      // ignore
+    }
+  };
+
   // Search existing donors when typing name or mobile
   const handleSearchDonor = async (text: string) => {
     if (!text || text.length < 2) {
@@ -77,15 +111,9 @@ function NewPavtiForm() {
       if (data.donors) {
         setDonorSuggestions(data.donors.slice(0, 4));
 
-        // Check for exact mobile duplicate if mobile is 10 digits
         const cleanMobile = text.replace(/\D/g, '');
         if (cleanMobile.length === 10) {
-          const exact = data.donors.find((d: Donor) => d.mobile.replace(/\D/g, '') === cleanMobile);
-          if (exact && exact.id !== selectedDonorId && !ignoreDuplicateWarning) {
-            setExistingDonorMatch(exact);
-          } else {
-            setExistingDonorMatch(null);
-          }
+          checkDuplicateDonor(cleanMobile, donorName);
         }
       }
     } catch {
@@ -99,7 +127,14 @@ function NewPavtiForm() {
     setDonorMobile(donor.mobile || '');
     setDonorAddress(donor.address || '');
     setDonorSuggestions([]);
-    setExistingDonorMatch(null);
+    setIsConfirmedForExistingDonor(true);
+    setIsDuplicateModalOpen(false);
+  };
+
+  const handleAcceptExistingDonorForNewPavti = () => {
+    if (duplicateCheckDonor) {
+      handleSelectDonor(duplicateCheckDonor);
+    }
   };
 
   const numAmount = Number(amount) || 0;
@@ -109,13 +144,28 @@ function NewPavtiForm() {
     setError('');
 
     if (!donorName.trim()) {
-      setError(language === 'mr' ? 'कृपया देणगीदाराचे नाव प्रविष्ट करा.' : 'Please enter donor name.');
+      setError(isEn ? 'Please enter donor name.' : 'कृपया देणगीदाराचे नाव प्रविष्ट करा.');
       return;
     }
 
     if (numAmount <= 0) {
-      setError(language === 'mr' ? 'कृपया वैध रक्कम प्रविष्ट करा (किमान ₹१).' : 'Please enter a valid amount (minimum ₹1).');
+      setError(isEn ? 'Please enter a valid amount (minimum ₹1).' : 'कृपया वैध रक्कम प्रविष्ट करा (किमान ₹१).');
       return;
+    }
+
+    // If mobile number entered is 10 digits and not confirmed yet, verify duplicate before submitting
+    const cleanMobile = donorMobile.replace(/\D/g, '');
+    if (cleanMobile.length === 10 && !selectedDonorId && !isConfirmedForExistingDonor) {
+      try {
+        const res = await fetch(`/api/donors/check?mobile=${cleanMobile}&mode=${mode}`);
+        const checkData = await res.json();
+        if (checkData.exists && checkData.donor) {
+          setDuplicateCheckDonor(checkData.donor);
+          setDuplicateRecentPavtis(checkData.recentPavtis || []);
+          setIsDuplicateModalOpen(true);
+          return;
+        }
+      } catch {}
     }
 
     setIsLoading(true);
@@ -183,12 +233,12 @@ function NewPavtiForm() {
           </button>
           <div>
             <h1 className="text-xl sm:text-2xl font-black font-devanagari text-stone-900">
-              {language === 'mr' ? 'नवीन पावती तयार करा' : 'Create New Receipt'}
+              {isEn ? 'Create New Receipt' : 'नवीन पावती तयार करा'}
             </h1>
             <p className="text-xs text-stone-500 font-devanagari">
-              {language === 'mr'
-                ? 'रोख, UPI किंवा येणे बाकी (Due) पावती तत्काळ तयार करा'
-                : 'Generate Cash, UPI, or Due receipts instantly'}
+              {isEn
+                ? 'Generate Cash, UPI, or Due receipts instantly'
+                : 'रोख, यूपीआय किंवा येणे बाकी पावती तत्काळ तयार करा'}
             </p>
           </div>
         </div>
@@ -206,48 +256,23 @@ function NewPavtiForm() {
           <form onSubmit={handleSubmit} className="space-y-6">
             {/* SECTION 1: DONOR INFORMATION */}
             <div className="space-y-4">
-              <h3 className="text-sm font-bold text-amber-900 uppercase tracking-wider font-devanagari flex items-center gap-1.5 pb-2 border-b border-amber-100">
-                <User className="w-4 h-4 text-orange-600" />
-                <span>{language === 'mr' ? '१. देणगीदाराची माहिती' : '1. Donor Details'}</span>
-              </h3>
-
-              {/* Duplicate Donor Warning Card */}
-              {existingDonorMatch && !ignoreDuplicateWarning && (
-                <div className="p-4 bg-amber-50 border-2 border-amber-400 rounded-2xl space-y-2.5 animate-in fade-in">
-                  <div className="flex items-center gap-2 font-bold text-xs text-amber-950 font-devanagari">
-                    <AlertTriangle className="w-4 h-4 text-orange-600 flex-shrink-0" />
-                    <span>
-                      {language === 'mr'
-                        ? 'संभाव्य विद्यमान देणगीदार आढळले (Possible Existing Member)'
-                        : 'Possible Existing Member Found'}
-                    </span>
-                  </div>
-                  <div className="text-xs text-stone-700 font-devanagari pl-6">
-                    हा मोबाईल नंबर (<strong>{existingDonorMatch.mobile}</strong>) आधीच <strong>{existingDonorMatch.name}</strong> यांच्या नावावर नोंदणीकृत आहे. एकूण जमा: <strong>{formatIndianCurrency(existingDonorMatch.totalContributed)}</strong> ({existingDonorMatch.pavtiCount} पावत्या).
-                  </div>
-                  <div className="flex flex-wrap items-center gap-2 pt-1 pl-6">
-                    <button
-                      type="button"
-                      onClick={() => handleSelectDonor(existingDonorMatch)}
-                      className="px-3 py-1.5 bg-orange-600 text-white rounded-lg text-xs font-bold font-devanagari hover:bg-orange-700 shadow-sm"
-                    >
-                      विद्यमान माहिती वापरा (Use Existing)
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setIgnoreDuplicateWarning(true)}
-                      className="px-3 py-1.5 bg-stone-100 text-stone-700 hover:bg-stone-200 rounded-lg text-xs font-semibold font-devanagari"
-                    >
-                      तरीही नवीन तयार करा (Create Anyway)
-                    </button>
-                  </div>
-                </div>
-              )}
+              <div className="flex items-center justify-between pb-2 border-b border-amber-100">
+                <h3 className="text-sm font-bold text-amber-900 uppercase tracking-wider font-devanagari flex items-center gap-1.5">
+                  <User className="w-4 h-4 text-orange-600" />
+                  <span>{isEn ? '1. Donor Information' : '१. देणगीदाराची माहिती'}</span>
+                </h3>
+                {selectedDonorId && (
+                  <span className="text-[11px] font-bold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200 font-devanagari flex items-center gap-1">
+                    <span>✓</span>
+                    <span>{isEn ? 'Existing Donor Selected' : 'नोंदणीकृत देणगीदार निवडले'}</span>
+                  </span>
+                )}
+              </div>
 
               {/* Donor Name with Suggestions */}
               <div className="space-y-1 relative">
                 <label className="block text-xs font-bold text-stone-700 font-devanagari">
-                  {language === 'mr' ? 'देणगीदाराचे पूर्ण नाव *' : 'Donor Full Name *'}
+                  {isEn ? 'Donor Full Name *' : 'देणगीदाराचे पूर्ण नाव *'}
                 </label>
                 <input
                   type="text"
@@ -255,19 +280,31 @@ function NewPavtiForm() {
                   value={donorName}
                   onChange={(e) => {
                     setDonorName(e.target.value);
-                    setSelectedDonorId(null);
-                    setIgnoreDuplicateWarning(false);
+                    if (selectedDonorId) setSelectedDonorId(null);
+                    setIsConfirmedForExistingDonor(false);
                     handleSearchDonor(e.target.value);
                   }}
-                  placeholder={language === 'mr' ? 'उदा. श्री. राहुल पाटील' : 'e.g. Rahul Patil'}
+                  onBlur={() => {
+                    if (donorName.trim().length >= 3 && !selectedDonorId) {
+                      checkDuplicateDonor(donorMobile, donorName);
+                    }
+                  }}
+                  placeholder={isEn ? 'e.g. Rahul Patil' : 'उदा. राहुल पाटील'}
                   className="w-full px-3.5 py-2.5 bg-white border border-stone-300 rounded-lg text-sm text-stone-900 font-devanagari focus:outline-none focus:ring-2 focus:ring-orange-500 font-bold"
                 />
 
                 {/* Autocomplete Suggestions */}
                 {donorSuggestions.length > 0 && (
                   <div className="absolute left-0 right-0 top-full mt-1 bg-white border border-stone-200 rounded-xl shadow-xl z-20 overflow-hidden divide-y divide-stone-100">
-                    <div className="p-2 bg-amber-50 text-[11px] font-bold text-amber-900 font-devanagari">
-                      पूर्वीचे देणगीदार आढळले (क्लिक करून निवडा):
+                    <div className="p-2 bg-amber-50 text-[11px] font-bold text-amber-900 font-devanagari flex items-center justify-between">
+                      <span>{isEn ? 'Existing Donors Found:' : 'पूर्वीचे देणगीदार आढळले:'}</span>
+                      <button
+                        type="button"
+                        onClick={() => setDonorSuggestions([])}
+                        className="text-stone-400 hover:text-stone-700"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
                     </div>
                     {donorSuggestions.map((d) => (
                       <button
@@ -278,7 +315,7 @@ function NewPavtiForm() {
                       >
                         <div className="font-bold text-stone-900">{d.name}</div>
                         <div className="text-stone-500 font-mono">
-                          {d.mobile || '-'} • एकूण: {formatIndianCurrency(d.totalContributed)}
+                          {d.mobile || '-'} • {isEn ? 'Total:' : 'एकूण:'} {formatIndianCurrency(d.totalContributed)}
                         </div>
                       </button>
                     ))}
@@ -291,7 +328,7 @@ function NewPavtiForm() {
                 <div className="space-y-1">
                   <label className="block text-xs font-bold text-stone-700 font-devanagari flex items-center gap-1">
                     <Phone className="w-3.5 h-3.5 text-stone-400" />
-                    <span>{language === 'mr' ? 'मोबाईल नंबर' : 'Mobile Number'}</span>
+                    <span>{isEn ? 'Mobile Number' : 'मोबाईल नंबर'}</span>
                   </label>
                   <input
                     type="tel"
@@ -300,23 +337,34 @@ function NewPavtiForm() {
                     onChange={(e) => {
                       const val = e.target.value.replace(/\D/g, '');
                       setDonorMobile(val);
-                      if (val.length >= 4) handleSearchDonor(val);
+                      if (selectedDonorId) setSelectedDonorId(null);
+                      setIsConfirmedForExistingDonor(false);
+                      if (val.length === 10) {
+                        checkDuplicateDonor(val, donorName);
+                      } else if (val.length >= 4) {
+                        handleSearchDonor(val);
+                      }
                     }}
-                    placeholder="उदा. 98XXXXXXXX"
-                    className="w-full px-3.5 py-2.5 bg-white border border-stone-300 rounded-lg text-sm text-stone-900 font-mono focus:outline-none focus:ring-2 focus:ring-orange-500"
+                    onBlur={() => {
+                      if (donorMobile.length === 10 && !selectedDonorId) {
+                        checkDuplicateDonor(donorMobile, donorName);
+                      }
+                    }}
+                    placeholder="98XXXXXXXX"
+                    className="w-full px-3.5 py-2.5 bg-white border border-stone-300 rounded-lg text-sm text-stone-900 font-mono focus:outline-none focus:ring-2 focus:ring-orange-500 font-semibold"
                   />
                 </div>
 
                 <div className="space-y-1">
                   <label className="block text-xs font-bold text-stone-700 font-devanagari flex items-center gap-1">
                     <MapPin className="w-3.5 h-3.5 text-stone-400" />
-                    <span>{language === 'mr' ? 'पत्ता / गल्ली' : 'Address'}</span>
+                    <span>{isEn ? 'Address' : 'पत्ता'}</span>
                   </label>
                   <input
                     type="text"
                     value={donorAddress}
                     onChange={(e) => setDonorAddress(e.target.value)}
-                    placeholder="उदा. तापडिया नगर, अकोला"
+                    placeholder={isEn ? 'e.g. Tapadiya Nagar, Akola' : 'उदा. तापडिया नगर, अकोला'}
                     className="w-full px-3.5 py-2.5 bg-white border border-stone-300 rounded-lg text-sm text-stone-900 font-devanagari focus:outline-none focus:ring-2 focus:ring-orange-500"
                   />
                 </div>
@@ -327,7 +375,7 @@ function NewPavtiForm() {
             <div className="space-y-4 pt-2">
               <h3 className="text-sm font-bold text-amber-900 uppercase tracking-wider font-devanagari flex items-center gap-1.5 pb-2 border-b border-amber-100">
                 <CreditCard className="w-4 h-4 text-orange-600" />
-                <span>{language === 'mr' ? '२. वर्गणी रक्कम व पेमेंट पद्धत' : '2. Amount & Payment Method'}</span>
+                <span>{isEn ? '2. Contribution Amount and Payment Method' : '२. वर्गणी रक्कम व पेमेंट पद्धत'}</span>
               </h3>
 
               {/* Amount Input */}
@@ -335,8 +383,8 @@ function NewPavtiForm() {
                 <div className="flex items-center justify-between">
                   <label className="block text-xs font-bold text-stone-700 font-devanagari">
                     {paymentChoice === 'DUE'
-                      ? (language === 'mr' ? 'अपेक्षित / येणे बाकी रक्कम *' : 'Due Amount *')
-                      : (language === 'mr' ? 'प्राप्त रक्कम *' : 'Amount Received *')}
+                      ? (isEn ? 'Expected / Due Amount *' : 'अपेक्षित / येणे बाकी रक्कम *')
+                      : (isEn ? 'Received Amount *' : 'प्राप्त रक्कम *')}
                   </label>
                   <span className="text-xs font-bold text-orange-600 font-mono">
                     {formatIndianCurrency(numAmount)}
@@ -379,10 +427,9 @@ function NewPavtiForm() {
                 {/* Realtime Number-in-words Preview */}
                 <div className="p-3 bg-amber-50/80 rounded-lg border border-amber-200 space-y-0.5">
                   <div className="text-xs font-bold text-amber-950 font-devanagari">
-                    अक्षरी (Marathi): {numberToWordsMarathi(numAmount)}
-                  </div>
-                  <div className="text-[11px] text-stone-500 italic">
-                    In Words: {numberToWordsEnglish(numAmount)}
+                    {isEn
+                      ? `In Words: ${numberToWordsEnglish(numAmount)}`
+                      : `अक्षरी : ${numberToWordsMarathi(numAmount)}`}
                   </div>
                 </div>
               </div>
@@ -390,7 +437,7 @@ function NewPavtiForm() {
               {/* PAYMENT / STATUS SELECTION (Cash, UPI, Due / बाकी) */}
               <div className="space-y-3 pt-2">
                 <label className="block text-xs font-bold text-stone-700 font-devanagari">
-                  {language === 'mr' ? 'पेमेंट प्रकार / स्थिती निवडा :' : 'Select Payment Option / Status :'}
+                  {isEn ? 'Select Payment Mode :' : 'पेमेंट प्रकार निवडा :'}
                 </label>
                 <div className="grid grid-cols-3 gap-2.5">
                   {/* 1. CASH */}
@@ -404,7 +451,7 @@ function NewPavtiForm() {
                     }`}
                   >
                     <span>💵</span>
-                    <span>{language === 'mr' ? 'रोख (Cash)' : 'Cash'}</span>
+                    <span>{isEn ? 'Cash' : 'रोख'}</span>
                   </button>
 
                   {/* 2. UPI */}
@@ -418,7 +465,7 @@ function NewPavtiForm() {
                     }`}
                   >
                     <span>📱</span>
-                    <span>{language === 'mr' ? 'UPI (ऑनलाइन)' : 'UPI'}</span>
+                    <span>{isEn ? 'UPI' : 'यूपीआय'}</span>
                   </button>
 
                   {/* 3. DUE / बाकी */}
@@ -432,7 +479,7 @@ function NewPavtiForm() {
                     }`}
                   >
                     <span>⏳</span>
-                    <span>{language === 'mr' ? 'बाकी (Due)' : 'Due / बाकी'}</span>
+                    <span>{isEn ? 'Due' : 'बाकी'}</span>
                   </button>
                 </div>
 
@@ -440,13 +487,13 @@ function NewPavtiForm() {
                 {paymentChoice === 'UPI' && (
                   <div className="p-3.5 bg-blue-50/60 rounded-xl border border-blue-200 space-y-1.5 animate-in fade-in">
                     <label className="block text-xs font-bold text-blue-900 font-devanagari">
-                      {language === 'mr' ? 'UPI Transaction ID / Ref Number (ऐच्छिक)' : 'UPI Transaction ID / Ref Number (Optional)'}
+                      {isEn ? 'UPI Transaction ID / Ref Number' : 'यूपीआय संदर्भ क्रमांक'}
                     </label>
                     <input
                       type="text"
                       value={transactionReference}
                       onChange={(e) => setTransactionReference(e.target.value)}
-                      placeholder="उदा. 423589123456 किंवा GooglePay/PhonePe Ref"
+                      placeholder={isEn ? 'e.g. 423589123456 or UTR Ref' : 'उदा. 423589123456 किंवा UTR Ref'}
                       className="w-full px-3 py-2 bg-white border border-blue-300 rounded-lg text-xs font-mono text-stone-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
                     />
                   </div>
@@ -456,10 +503,12 @@ function NewPavtiForm() {
                 {paymentChoice === 'DUE' && (
                   <div className="p-3 bg-amber-100/70 border border-amber-300 rounded-xl text-xs text-amber-900 font-devanagari space-y-0.5 animate-in fade-in">
                     <div className="font-bold">
-                      ℹ️ बाकी (Due) पावती तयार होईल:
+                      {isEn ? 'ℹ️ Due Receipt will be created:' : 'ℹ️ बाकी पावती तयार होईल:'}
                     </div>
                     <div className="text-[11px] text-amber-800">
-                      पावतीवर <strong>बाकी / DUE</strong> स्थिती दिसेल. पैसे प्रत्यक्षात मिळेपर्यंत अधिकृत पावती क्रमांक दिला जाणार नाही व ही रक्कम बाकी यादीत जोडली जाईल.
+                      {isEn
+                        ? 'The receipt will be issued with official number and marked as DUE. This amount will be added to the pending list until paid.'
+                        : 'पावतीवर अधिकृत अनुक्रमांक व बाकी स्थिती दिसेल. ही रक्कम बाकी यादीत जोडली जाईल व पैसे मिळाल्यावर याच पावतीवर जमा केली जाईल.'}
                     </div>
                   </div>
                 )}
@@ -468,13 +517,13 @@ function NewPavtiForm() {
               {/* Notes */}
               <div className="space-y-1 pt-1">
                 <label className="block text-xs font-bold text-stone-700 font-devanagari">
-                  {language === 'mr' ? 'नोंद / टीप (Optional Notes)' : 'Notes (Optional)'}
+                  {isEn ? 'Notes (Optional)' : 'टीप'}
                 </label>
                 <input
                   type="text"
                   value={notes}
                   onChange={(e) => setNotes(e.target.value)}
-                  placeholder="उदा. महाप्रसाद देणगी / आरती वर्गणी"
+                  placeholder={isEn ? 'e.g. Prasad donation / Aarti contribution' : 'उदा. महाप्रसाद देणगी / आरती वर्गणी'}
                   className="w-full px-3.5 py-2 bg-white border border-stone-300 rounded-lg text-xs text-stone-900 font-devanagari focus:outline-none focus:ring-2 focus:ring-orange-500"
                 />
               </div>
@@ -493,8 +542,8 @@ function NewPavtiForm() {
                   <FileCheck className="w-5 h-5" />
                   <span>
                     {paymentChoice === 'DUE'
-                      ? (language === 'mr' ? 'बाकी पावती तयार करा (Generate Due Pavti)' : 'Generate Due Receipt')
-                      : (language === 'mr' ? 'अधिकृत पावती तयार करा (Generate Paid Pavti)' : 'Generate Official Receipt')}
+                      ? (isEn ? 'Generate Due Receipt' : 'बाकी पावती तयार करा')
+                      : (isEn ? 'Generate Official Receipt' : 'अधिकृत पावती तयार करा')}
                   </span>
                 </span>
               </Button>
@@ -518,11 +567,7 @@ function NewPavtiForm() {
             isOpen={isShareModalOpen}
             onClose={() => {
               setIsShareModalOpen(false);
-              if (generatedResult.pavti.status === 'DUE' || !generatedResult.pavti.receiptNumber) {
-                router.push('/pending');
-              } else {
-                router.push(`/pavti/${generatedResult.pavti.receiptNumber}`);
-              }
+              router.push(`/pavti/${generatedResult.pavti.receiptNumber || generatedResult.payment.id}`);
             }}
             pavti={generatedResult.pavti}
             settings={settings}
@@ -530,6 +575,147 @@ function NewPavtiForm() {
           />
         </>
       )}
+
+      {/* DUPLICATE DONOR CONFIRMATION MODAL POPUP */}
+      <Modal
+        isOpen={isDuplicateModalOpen}
+        onClose={() => setIsDuplicateModalOpen(false)}
+        title={
+          <div className="flex items-center gap-2 text-amber-700">
+            <AlertTriangle className="w-5 h-5 text-amber-600 flex-shrink-0" />
+            <span className="font-devanagari font-bold text-base sm:text-lg">
+              {isEn ? 'Donor Already Exists!' : 'हा देणगीदार आधीच नोंदणीकृत आहे!'}
+            </span>
+          </div>
+        }
+        description={
+          isEn
+            ? 'A donor with this mobile number/name is already recorded in the system.'
+            : 'या मोबाईल नंबरवर/नावावर आधीच देणगीदाराची नोंदणी व पावती झालेली आहे.'
+        }
+        maxWidth="md"
+      >
+        {duplicateCheckDonor && (
+          <div className="space-y-4">
+            {/* Donor Detail Card */}
+            <div className="p-3.5 bg-amber-50/90 rounded-xl border border-amber-300 space-y-2">
+              <div className="flex items-center justify-between border-b border-amber-200 pb-2">
+                <div className="font-bold text-sm sm:text-base text-stone-900 font-devanagari">
+                  👤 {duplicateCheckDonor.name}
+                </div>
+                <span className="text-xs font-mono font-bold text-amber-900 bg-amber-200/80 px-2 py-0.5 rounded border border-amber-300">
+                  📱 {duplicateCheckDonor.mobile || '-'}
+                </span>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2 text-xs font-devanagari text-stone-700 pt-0.5">
+                <div>
+                  <span className="text-stone-500">{isEn ? 'Total Donated:' : 'एकूण वर्गणी:'} </span>
+                  <span className="font-bold text-orange-700 font-mono">
+                    {formatIndianCurrency(duplicateCheckDonor.totalContributed)}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-stone-500">{isEn ? 'Total Receipts:' : 'एकूण पावत्या:'} </span>
+                  <span className="font-bold text-stone-900">
+                    {duplicateCheckDonor.pavtiCount} {isEn ? 'Pavtis' : 'पावत्या'}
+                  </span>
+                </div>
+              </div>
+
+              {duplicateCheckDonor.address && (
+                <div className="text-xs font-devanagari text-stone-600 truncate pt-0.5 border-t border-amber-200/60">
+                  📍 {duplicateCheckDonor.address}
+                </div>
+              )}
+            </div>
+
+            {/* Recent Receipts if available */}
+            {duplicateRecentPavtis.length > 0 && (
+              <div className="space-y-2">
+                <div className="text-xs font-bold text-stone-700 font-devanagari flex items-center gap-1.5">
+                  <History className="w-3.5 h-3.5 text-orange-600" />
+                  <span>{isEn ? 'Previous Receipts for this Donor:' : 'या देणगीदाराच्या आधीच्या पावत्या:'}</span>
+                </div>
+                <div className="space-y-1.5 max-h-36 overflow-y-auto">
+                  {duplicateRecentPavtis.map((p) => (
+                    <div
+                      key={p.id}
+                      className="p-2.5 bg-stone-50 rounded-lg border border-stone-200 flex items-center justify-between text-xs font-devanagari"
+                    >
+                      <div>
+                        <div className="font-bold font-mono text-orange-950">
+                          #{p.receiptNumber} • {formatIndianCurrency(p.amount)}
+                        </div>
+                        <div className="text-[11px] text-stone-500 font-mono">
+                          {p.date} • {p.status === 'DUE' ? (isEn ? 'DUE' : 'बाकी') : (isEn ? 'PAID' : 'जमा')}
+                        </div>
+                      </div>
+                      <Link
+                        href={`/pavti/${p.receiptNumber || p.id}`}
+                        target="_blank"
+                        className="px-2 py-1 bg-white hover:bg-orange-50 text-orange-700 border border-orange-200 rounded text-[11px] font-bold flex items-center gap-1 transition-colors"
+                      >
+                        <span>{isEn ? 'View' : 'पाहा'}</span>
+                        <ExternalLink className="w-3 h-3" />
+                      </Link>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Action Buttons */}
+            <div className="pt-3 border-t border-stone-200 space-y-2">
+              <Button
+                variant="primary"
+                onClick={handleAcceptExistingDonorForNewPavti}
+                className="w-full py-3 font-devanagari text-xs sm:text-sm font-bold flex items-center justify-center gap-2"
+              >
+                <PlusCircle className="w-4 h-4" />
+                <span>
+                  {isEn
+                    ? 'Yes, Add Another Receipt for this Donor'
+                    : 'होय, याच देणगीदाराची दुसरी पावती बनवा'}
+                </span>
+              </Button>
+
+              <div className="flex gap-2">
+                {duplicateRecentPavtis.length > 0 && (
+                  <Link
+                    href={`/pavti/${duplicateRecentPavtis[0].receiptNumber || duplicateRecentPavtis[0].id}`}
+                    target="_blank"
+                    className="flex-1"
+                  >
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="w-full py-2 font-devanagari text-xs text-stone-700"
+                    >
+                      <ExternalLink className="w-3.5 h-3.5 mr-1" />
+                      <span>{isEn ? 'View Last Receipt' : 'शेवटची पावती पाहा'}</span>
+                    </Button>
+                  </Link>
+                )}
+
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => {
+                    setIsDuplicateModalOpen(false);
+                    setDonorMobile('');
+                    setSelectedDonorId(null);
+                  }}
+                  className="flex-1 py-2 font-devanagari text-xs text-red-600 hover:bg-red-50 border-red-200"
+                >
+                  <X className="w-3.5 h-3.5 mr-1" />
+                  <span>{isEn ? 'Change Mobile / Cancel' : 'माहिती बदला / रद्द करा'}</span>
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
+      </Modal>
     </div>
   );
 }

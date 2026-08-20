@@ -75,6 +75,11 @@ export interface IStorageProvider {
     mode: AppMode
   ): Promise<Payment>;
   cancelPendingPayment(paymentId: string, mode: AppMode): Promise<Payment>;
+  deletePayment(
+    id: string,
+    mode: AppMode,
+    user?: { userId: string; userName: string; userRole: UserRole }
+  ): Promise<{ success: boolean; deletedPayment: Payment }>;
   getNextReceiptNumber(mode: AppMode): Promise<{ formatted: string; numeric: number }>;
   markPaymentAsPaid(
     paymentId: string,

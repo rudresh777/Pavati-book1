@@ -62,11 +62,11 @@ export interface Donor {
 }
 
 export type PaymentStatus = 'DUE' | 'PAID' | 'CANCELLED' | 'PENDING' | 'PARTIALLY_PAID';
-export type PaymentMethod = 'CASH' | 'UPI';
+export type PaymentMethod = 'CASH' | 'UPI' | 'DUE';
 
 export interface Payment {
   id: string;
-  receiptNumber?: string; // Formatted e.g. "000001" - only set when status is PAID
+  receiptNumber?: string; // Formatted e.g. "000001" - assigned sequentially for ALL receipts (both PAID and DUE)
   numericReceiptNumber?: number; // 1, 2, 3...
   donorId: string;
   donorName: string;
@@ -89,7 +89,7 @@ export interface Payment {
 
 export interface Pavti {
   id: string;
-  receiptNumber: string; // Empty string or "DUE" when unpaid, formatted "000001" when PAID
+  receiptNumber: string; // Sequential formatted number e.g. "000001" for both PAID and DUE
   numericReceiptNumber?: number;
   paymentId: string;
   donorId: string;

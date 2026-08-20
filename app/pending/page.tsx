@@ -31,7 +31,8 @@ import { PavtiShareModal } from '@/components/pavti/PavtiShareModal';
 
 export default function DueMembersPage() {
   const { mode } = useAppMode();
-  const { language } = useLanguage();
+  const { language, t } = useLanguage();
+  const isEn = language === 'en';
 
   const [pendingList, setPendingList] = useState<Payment[]>([]);
   const [settings, setSettings] = useState<MandalSettings | null>(null);
@@ -110,7 +111,7 @@ export default function DueMembersPage() {
 
     const numAmt = Number(receivedAmount);
     if (!numAmt || numAmt <= 0) {
-      setPaidModalError(language === 'mr' ? 'कृपया वैध रक्कम प्रविष्ट करा.' : 'Please enter a valid amount.');
+      setPaidModalError(isEn ? 'Please enter a valid amount.' : 'कृपया वैध रक्कम प्रविष्ट करा.');
       return;
     }
 
@@ -132,7 +133,7 @@ export default function DueMembersPage() {
       });
 
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'पेमेंट नोंदवण्यात त्रुटी आली.');
+      if (!res.ok) throw new Error(data.error || (isEn ? 'Failed to record payment.' : 'पेमेंट नोंदवण्यात त्रुटी आली.'));
 
       // Trigger Confetti
       confetti({
@@ -147,7 +148,7 @@ export default function DueMembersPage() {
       setIsShareModalOpen(true);
       fetchDueData();
     } catch (err: any) {
-      setPaidModalError(err.message || 'त्रुटी आली.');
+      setPaidModalError(err.message || (isEn ? 'Error occurred.' : 'त्रुटी आली.'));
     } finally {
       setIsSubmittingPaid(false);
     }
@@ -171,7 +172,7 @@ export default function DueMembersPage() {
 
     const numAmt = Number(editExpectedAmount);
     if (!numAmt || numAmt <= 0) {
-      setEditModalError(language === 'mr' ? 'कृपया वैध अपेक्षित रक्कम प्रविष्ट करा.' : 'Please enter a valid expected amount.');
+      setEditModalError(isEn ? 'Please enter a valid expected amount.' : 'कृपया वैध अपेक्षित रक्कम प्रविष्ट करा.');
       return;
     }
 
@@ -193,39 +194,34 @@ export default function DueMembersPage() {
       });
 
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'बदल सेव्ह करण्यात त्रुटी आली.');
+      if (!res.ok) throw new Error(data.error || (isEn ? 'Failed to save changes.' : 'बदल सेव्ह करण्यात त्रुटी आली.'));
 
       setEditPayment(null);
       fetchDueData();
     } catch (err: any) {
-      setEditModalError(err.message || 'त्रुटी आली.');
+      setEditModalError(err.message || (isEn ? 'Error occurred.' : 'त्रुटी आली.'));
     } finally {
       setIsSubmittingEdit(false);
     }
   };
 
-  // Submit Cancel Due Record
+  // Submit Delete Due Record
   const handleConfirmCancel = async () => {
     if (!cancelPayment || isSubmittingCancel) return;
 
     setIsSubmittingCancel(true);
     try {
-      const res = await fetch(`/api/payments/${cancelPayment.id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          status: 'CANCELLED',
-          mode,
-        }),
+      const res = await fetch(`/api/payments/${cancelPayment.id}?mode=${mode}`, {
+        method: 'DELETE',
       });
 
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'रद्द करण्यात त्रुटी आली.');
+      if (!res.ok) throw new Error(data.error || (isEn ? 'Failed to delete record.' : 'नोंद हटवण्यात त्रुटी आली.'));
 
       setCancelPayment(null);
       fetchDueData();
     } catch (err: any) {
-      alert(err.message || 'त्रुटी आली.');
+      alert(err.message || (isEn ? 'Error occurred.' : 'त्रुटी आली.'));
     } finally {
       setIsSubmittingCancel(false);
     }
@@ -241,10 +237,10 @@ export default function DueMembersPage() {
         setSelectedPavti(pavti);
         setIsShareModalOpen(true);
       } else {
-        alert('पावती उपलब्ध नाही.');
+        alert(isEn ? 'Receipt not found.' : 'पावती उपलब्ध नाही.');
       }
     } catch {
-      alert('पावती लोड करताना त्रुटी आली.');
+      alert(isEn ? 'Error loading receipt.' : 'पावती लोड करताना त्रुटी आली.');
     }
   };
 
@@ -280,12 +276,12 @@ export default function DueMembersPage() {
         <div>
           <h1 className="text-xl sm:text-2xl font-black font-devanagari text-stone-900 flex items-center gap-2">
             <Clock className="w-6 h-6 text-amber-600" />
-            <span>{language === 'mr' ? 'बाकी यादी (Due Members)' : 'Due Members List'}</span>
+            <span>{isEn ? 'Pending Collections' : 'येणे बाकी यादी'}</span>
           </h1>
           <p className="text-xs text-stone-500 font-devanagari">
-            {language === 'mr'
-              ? 'ज्या देणगीदारांची वर्गणी येणे बाकी आहे त्यांची यादी. पैसे प्राप्त झाल्यावर "पैसे मिळाले" वर क्लिक करा.'
-              : 'List of members with outstanding contributions. Click "Mark as Paid" once payment is received.'}
+            {isEn
+              ? 'List of members with pending contributions. Click "Mark as Paid" when received.'
+              : 'ज्या देणगीदारांची वर्गणी येणे बाकी आहे त्यांची यादी. पैसे प्राप्त झाल्यावर "पैसे मिळाले" वर क्लिक करा.'}
           </p>
         </div>
 
@@ -294,7 +290,7 @@ export default function DueMembersPage() {
           <div className="bg-amber-100/90 px-4 py-2 rounded-xl border-2 border-amber-300 shadow-sm text-right flex items-center gap-4">
             <div>
               <div className="text-[10px] font-bold text-amber-800 uppercase font-devanagari">
-                {language === 'mr' ? 'एकूण बाकीदार' : 'Due Members'}
+                {isEn ? 'Due Donors' : 'एकूण बाकीदार'}
               </div>
               <div className="text-lg font-black text-amber-950 font-mono">
                 {totalDueCount}
@@ -302,7 +298,7 @@ export default function DueMembersPage() {
             </div>
             <div className="border-l border-amber-300 pl-4">
               <div className="text-[10px] font-bold text-amber-800 uppercase font-devanagari">
-                {language === 'mr' ? 'एकूण बाकी रक्कम' : 'Total Due Amount'}
+                {isEn ? 'Total Due Amount' : 'एकूण बाकी रक्कम'}
               </div>
               <div className="text-lg sm:text-xl font-black text-amber-950 font-mono tracking-tight text-orange-900">
                 {formatIndianCurrency(totalDueAmount)}
@@ -313,7 +309,7 @@ export default function DueMembersPage() {
           <Link href="/pavti/new">
             <Button variant="primary" size="sm" className="font-devanagari py-2.5 px-3.5 flex items-center gap-1.5 shadow">
               <PlusCircle className="w-4 h-4" />
-              <span>{language === 'mr' ? '+ नवीन पावती / बाकी नोंद' : '+ New Pavti / Due'}</span>
+              <span>{isEn ? '+ New Receipt / Due' : '+ नवीन पावती / बाकी नोंद'}</span>
             </Button>
           </Link>
         </div>
@@ -327,7 +323,7 @@ export default function DueMembersPage() {
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder={language === 'mr' ? 'देणगीदाराचे नाव किंवा मोबाईल नंबर शोधा...' : 'Search by name or mobile number...'}
+            placeholder={isEn ? 'Search by donor name or mobile number...' : 'देणगीदाराचे नाव किंवा मोबाईल नंबर शोधा...'}
             className="w-full pl-9 pr-4 py-2 bg-stone-50 border border-stone-300 rounded-lg text-xs sm:text-sm text-stone-900 focus:outline-none focus:ring-2 focus:ring-orange-500 font-devanagari"
           />
         </div>
@@ -344,36 +340,37 @@ export default function DueMembersPage() {
               onClick={() => setDateFilter('')}
               className="text-xs text-stone-500 hover:text-red-600 underline font-devanagari"
             >
-              तारीख साफ करा
+              {isEn ? 'Clear Date' : 'तारीख साफ करा'}
             </button>
           )}
         </div>
       </div>
 
-      {/* SIMPLE TABLE FORMAT (EASY SCANNING & RESPONSIVE HORIZONTAL SCROLL) */}
+      {/* SIMPLE TABLE FORMAT */}
       <div className="bg-white rounded-2xl border border-amber-200 overflow-hidden shadow-sm">
         <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs text-stone-700 min-w-[700px]">
+          <table className="w-full text-left text-xs text-stone-700 min-w-[800px]">
             <thead className="bg-amber-50 text-amber-950 font-bold border-b border-amber-200 uppercase font-devanagari">
               <tr>
-                <th className="px-4 py-3.5">देणगीदार (Donor)</th>
-                <th className="px-4 py-3.5">मोबाईल (Mobile)</th>
-                <th className="px-4 py-3.5">पत्ता (Address)</th>
-                <th className="px-4 py-3.5">बाकी रक्कम (Due Amount)</th>
-                <th className="px-4 py-3.5">दिनांक (Date)</th>
-                <th className="px-4 py-3.5">स्थिती (Status)</th>
-                <th className="px-4 py-3.5 text-right">कृती (Action)</th>
+                <th className="px-4 py-3.5">{isEn ? 'Receipt #' : 'पावती क्र.'}</th>
+                <th className="px-4 py-3.5">{isEn ? 'Donor' : 'देणगीदार'}</th>
+                <th className="px-4 py-3.5">{isEn ? 'Mobile' : 'मोबाईल'}</th>
+                <th className="px-4 py-3.5">{isEn ? 'Address' : 'पत्ता'}</th>
+                <th className="px-4 py-3.5">{isEn ? 'Due Amount' : 'बाकी रक्कम'}</th>
+                <th className="px-4 py-3.5">{isEn ? 'Date' : 'दिनांक'}</th>
+                <th className="px-4 py-3.5">{isEn ? 'Status' : 'स्थिती'}</th>
+                <th className="px-4 py-3.5 text-right">{isEn ? 'Action' : 'कृती'}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-stone-100">
               {filteredDue.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="text-center py-12 text-stone-400 font-devanagari space-y-2">
+                  <td colSpan={8} className="text-center py-12 text-stone-400 font-devanagari space-y-2">
                     <CheckCircle2 className="w-10 h-10 text-emerald-500 mx-auto opacity-70" />
                     <div className="font-bold text-stone-700 text-sm">
                       {searchQuery || dateFilter
-                        ? 'दिलेल्या निकषानुसार कोणतीही बाकी नोंद आढळली नाही.'
-                        : 'सध्या कोणतीही बाकी रक्कम प्रलंबित नाही.'}
+                        ? (isEn ? 'No records match the filter criteria.' : 'दिलेल्या निकषानुसार कोणतीही बाकी नोंद आढळली नाही.')
+                        : (isEn ? 'No pending payments at this time.' : 'सध्या कोणतीही बाकी रक्कम प्रलंबित नाही.')}
                     </div>
                   </td>
                 </tr>
@@ -382,20 +379,25 @@ export default function DueMembersPage() {
                   const balance = p.expectedAmount - (p.receivedAmount || 0);
                   return (
                     <tr key={p.id} className="hover:bg-amber-50/50 transition-colors">
-                      {/* 1. Donor Name */}
+                      {/* 1. Receipt Number */}
+                      <td className="px-4 py-3.5 font-mono font-bold text-orange-800 whitespace-nowrap">
+                        {p.receiptNumber ? `#${p.receiptNumber}` : '-'}
+                      </td>
+
+                      {/* 2. Donor Name */}
                       <td className="px-4 py-3.5">
                         <div className="font-bold text-stone-900 text-sm font-devanagari">
                           {p.donorName}
                         </div>
                         {p.notes && (
                           <div className="text-[11px] text-stone-500 italic truncate max-w-xs font-devanagari">
-                            टीप: {p.notes}
+                            {isEn ? 'Note:' : 'टीप:'} {p.notes}
                           </div>
                         )}
                       </td>
 
-                      {/* 2. Mobile */}
-                      <td className="px-4 py-3.5 font-mono text-stone-700">
+                      {/* 3. Mobile */}
+                      <td className="px-4 py-3.5 font-mono text-stone-700 whitespace-nowrap">
                         {p.donorMobile ? (
                           <span className="flex items-center gap-1">
                             <Phone className="w-3 h-3 text-stone-400" />
@@ -406,47 +408,47 @@ export default function DueMembersPage() {
                         )}
                       </td>
 
-                      {/* 3. Address */}
-                      <td className="px-4 py-3.5 text-stone-600 max-w-[200px] truncate font-devanagari">
+                      {/* 4. Address */}
+                      <td className="px-4 py-3.5 text-stone-700 max-w-[200px] truncate font-devanagari">
                         {p.donorAddress || '-'}
                       </td>
 
-                      {/* 4. Due Amount */}
-                      <td className="px-4 py-3.5 font-mono font-bold text-base text-orange-800">
+                      {/* 5. Due Amount */}
+                      <td className="px-4 py-3.5 font-mono font-bold text-base text-orange-800 whitespace-nowrap">
                         {formatIndianCurrency(balance)}
                       </td>
 
-                      {/* 5. Date */}
-                      <td className="px-4 py-3.5 font-mono text-stone-500">
+                      {/* 6. Date */}
+                      <td className="px-4 py-3.5 font-mono text-stone-500 whitespace-nowrap">
                         {p.date}
                       </td>
 
-                      {/* 6. Status */}
-                      <td className="px-4 py-3.5">
+                      {/* 7. Status */}
+                      <td className="px-4 py-3.5 whitespace-nowrap">
                         <span className="px-2.5 py-1 bg-amber-100 text-amber-900 border border-amber-300 rounded-md font-bold text-[11px] font-devanagari inline-block shadow-sm">
-                          बाकी / DUE
+                          {isEn ? 'DUE' : 'बाकी'}
                         </span>
                       </td>
 
-                      {/* 7. Action */}
-                      <td className="px-4 py-3.5 text-right">
+                      {/* 8. Action */}
+                      <td className="px-4 py-3.5 text-right whitespace-nowrap">
                         <div className="flex items-center justify-end gap-2">
                           {/* Mark as Paid Action Button */}
                           <button
                             type="button"
                             onClick={() => handleOpenMarkPaid(p)}
-                            className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-bold text-xs font-devanagari shadow-sm transition-all flex items-center gap-1.5"
+                            className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-bold text-xs font-devanagari shadow-sm transition-all flex items-center gap-1.5 cursor-pointer"
                           >
                             <CheckCircle2 className="w-3.5 h-3.5" />
-                            <span>{language === 'mr' ? 'पैसे मिळाले' : 'Mark as Paid'}</span>
+                            <span>{isEn ? 'Mark as Paid' : 'पैसे मिळाले'}</span>
                           </button>
 
                           {/* Preview Due Pavti */}
                           <button
                             type="button"
                             onClick={() => handlePreviewDuePavti(p.id)}
-                            title="बाकी पावती पहा / शेअर करा"
-                            className="p-1.5 text-amber-700 hover:text-orange-900 hover:bg-amber-100 rounded-lg transition-colors"
+                            title={isEn ? 'View / Share Receipt' : 'बाकी पावती पहा'}
+                            className="p-1.5 text-amber-700 hover:text-orange-900 hover:bg-amber-100 rounded-lg transition-colors cursor-pointer"
                           >
                             <Eye className="w-4 h-4" />
                           </button>
@@ -455,18 +457,18 @@ export default function DueMembersPage() {
                           <button
                             type="button"
                             onClick={() => handleOpenEdit(p)}
-                            title="संपादित करा"
-                            className="p-1.5 text-stone-600 hover:text-orange-600 hover:bg-stone-100 rounded-lg transition-colors"
+                            title={isEn ? 'Edit' : 'संपादित करा'}
+                            className="p-1.5 text-stone-600 hover:text-orange-600 hover:bg-stone-100 rounded-lg transition-colors cursor-pointer"
                           >
                             <Edit2 className="w-4 h-4" />
                           </button>
 
-                          {/* Cancel Due Record */}
+                          {/* Delete Due Record */}
                           <button
                             type="button"
                             onClick={() => setCancelPayment(p)}
-                            title="रद्द करा"
-                            className="p-1.5 text-stone-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                            title={isEn ? 'Delete' : 'हटवा'}
+                            className="p-1.5 text-stone-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors cursor-pointer"
                           >
                             <Trash2 className="w-4 h-4" />
                           </button>
@@ -490,11 +492,11 @@ export default function DueMembersPage() {
             <div className="flex items-center gap-2 text-emerald-700">
               <CheckCircle2 className="w-5 h-5 text-emerald-600" />
               <span className="font-devanagari">
-                {language === 'mr' ? 'पेमेंट पुष्टीकरण (Confirm Payment)' : 'Confirm Payment'}
+                {isEn ? 'Confirm Payment' : 'पेमेंट पुष्टीकरण'}
               </span>
             </div>
           }
-          description={`${markPaidPayment.donorName} यांच्याकडून देणगी रक्कम प्रत्यक्षात प्राप्त झाली आहे का?`}
+          description={isEn ? `Confirm that donation has been received from ${markPaidPayment.donorName}?` : `${markPaidPayment.donorName} यांच्याकडून देणगी रक्कम प्राप्त झाली आहे का?`}
           maxWidth="md"
         >
           <form onSubmit={handleConfirmPaid} className="space-y-4 pt-1">
@@ -507,11 +509,11 @@ export default function DueMembersPage() {
             {/* Donor & Amount Box */}
             <div className="p-3.5 bg-amber-50 rounded-xl border border-amber-200 text-xs text-stone-800 space-y-1.5 font-devanagari">
               <div className="flex justify-between">
-                <span>देणगीदार (Donor):</span>
+                <span>{isEn ? 'Donor:' : 'देणगीदार:'}</span>
                 <strong className="text-stone-900">{markPaidPayment.donorName}</strong>
               </div>
               <div className="flex justify-between font-bold text-amber-900 text-sm">
-                <span>बाकी रक्कम (Due Amount):</span>
+                <span>{isEn ? 'Due Amount:' : 'बाकी रक्कम:'}</span>
                 <span className="font-mono text-orange-900 text-base">
                   {formatIndianCurrency(
                     markPaidPayment.expectedAmount - (markPaidPayment.receivedAmount || 0)
@@ -523,7 +525,7 @@ export default function DueMembersPage() {
             {/* Received Amount Input */}
             <div className="space-y-1">
               <label className="block text-xs font-bold text-stone-700 font-devanagari">
-                {language === 'mr' ? 'प्रत्यक्षात प्राप्त रक्कम (Received Amount) *' : 'Actual Received Amount *'}
+                {isEn ? 'Actual Received Amount *' : 'प्रत्यक्षात प्राप्त रक्कम *'}
               </label>
               <div className="relative">
                 <span className="absolute left-3.5 top-1/2 -translate-y-1/2 font-bold text-stone-500">
@@ -543,7 +545,7 @@ export default function DueMembersPage() {
             {/* Payment Method (Cash or UPI only) */}
             <div className="space-y-2">
               <label className="block text-xs font-bold text-stone-700 font-devanagari">
-                {language === 'mr' ? 'पेमेंट पद्धत निवडा :' : 'Payment Method :'}
+                {isEn ? 'Payment Method :' : 'पेमेंट पद्धत निवडा :'}
               </label>
               <div className="grid grid-cols-2 gap-2">
                 <button
@@ -555,7 +557,7 @@ export default function DueMembersPage() {
                       : 'bg-stone-50 border-stone-200 text-stone-700'
                   }`}
                 >
-                  💵 {language === 'mr' ? 'रोख (Cash)' : 'Cash'}
+                  💵 {isEn ? 'Cash' : 'रोख'}
                 </button>
                 <button
                   type="button"
@@ -566,20 +568,20 @@ export default function DueMembersPage() {
                       : 'bg-stone-50 border-stone-200 text-stone-700'
                   }`}
                 >
-                  📱 {language === 'mr' ? 'UPI (ऑनलाइन)' : 'UPI'}
+                  📱 {isEn ? 'UPI' : 'यूपीआय'}
                 </button>
               </div>
 
               {paymentMethod === 'UPI' && (
                 <div className="space-y-1 pt-1 animate-in fade-in">
                   <label className="block text-[11px] font-bold text-blue-900 font-devanagari">
-                    UPI Transaction ID / Ref Number (ऐच्छिक)
+                    {isEn ? 'UPI Ref / UTR Number (Optional)' : 'यूपीआय संदर्भ क्रमांक (ऐच्छिक)'}
                   </label>
                   <input
                     type="text"
                     value={transactionReference}
                     onChange={(e) => setTransactionReference(e.target.value)}
-                    placeholder="उदा. 423589123456"
+                    placeholder={isEn ? 'e.g. 423589123456' : 'उदा. 423589123456'}
                     className="w-full px-3 py-2 border border-blue-300 rounded-lg text-xs font-mono"
                   />
                 </div>
@@ -589,7 +591,7 @@ export default function DueMembersPage() {
             {/* Payment Date */}
             <div className="space-y-1">
               <label className="block text-xs font-bold text-stone-700 font-devanagari">
-                {language === 'mr' ? 'पेमेंट दिनांक (Date)' : 'Payment Date'}
+                {isEn ? 'Payment Date' : 'पेमेंट दिनांक'}
               </label>
               <input
                 type="date"
@@ -603,13 +605,13 @@ export default function DueMembersPage() {
             {/* Notes */}
             <div className="space-y-1">
               <label className="block text-xs font-bold text-stone-700 font-devanagari">
-                {language === 'mr' ? 'टीप / शेरा (Optional Notes)' : 'Notes'}
+                {isEn ? 'Notes (Optional)' : 'टीप'}
               </label>
               <input
                 type="text"
                 value={paidNotes}
                 onChange={(e) => setPaidNotes(e.target.value)}
-                placeholder="उदा. वर्गणी प्राप्त झाली"
+                placeholder={isEn ? 'e.g. Received in full' : 'उदा. वर्गणी प्राप्त झाली'}
                 className="w-full px-3 py-2 border border-stone-300 rounded-lg text-xs font-devanagari"
               />
             </div>
@@ -621,7 +623,7 @@ export default function DueMembersPage() {
                 size="sm"
                 onClick={() => setMarkPaidPayment(null)}
               >
-                रद्द करा (Cancel)
+                {t('common.cancel')}
               </Button>
               <Button
                 type="submit"
@@ -630,7 +632,7 @@ export default function DueMembersPage() {
                 isLoading={isSubmittingPaid}
                 className="font-devanagari font-bold px-5 bg-emerald-600 hover:bg-emerald-700 text-white"
               >
-                होय, पैसे जमा झाले (Confirm Paid)
+                {isEn ? 'Confirm Paid' : 'होय, पैसे जमा झाले'}
               </Button>
             </div>
           </form>
@@ -645,10 +647,12 @@ export default function DueMembersPage() {
           title={
             <div className="flex items-center gap-2">
               <Edit2 className="w-5 h-5 text-orange-600" />
-              <span className="font-devanagari">बाकी नोंद संपादित करा</span>
+              <span className="font-devanagari">
+                {isEn ? 'Edit Pending Record' : 'बाकी नोंद बदल करा'}
+              </span>
             </div>
           }
-          description="देणगीदाराचे नाव, मोबाईल किंवा अपेक्षित रक्कम अद्ययावत करा."
+          description={isEn ? 'Update donor details or expected amount.' : 'देणगीदाराचे नाव, मोबाईल किंवा अपेक्षित रक्कम अद्ययावत करा.'}
           maxWidth="md"
         >
           <form onSubmit={handleConfirmEdit} className="space-y-4">
@@ -661,7 +665,7 @@ export default function DueMembersPage() {
             {/* Donor Name */}
             <div className="space-y-1">
               <label className="block text-xs font-bold text-stone-700 font-devanagari">
-                देणगीदाराचे पूर्ण नाव *
+                {isEn ? 'Donor Full Name *' : 'देणगीदाराचे पूर्ण नाव *'}
               </label>
               <input
                 type="text"
@@ -676,7 +680,7 @@ export default function DueMembersPage() {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="space-y-1">
                 <label className="block text-xs font-bold text-stone-700 font-devanagari">
-                  मोबाईल नंबर
+                  {isEn ? 'Mobile Number' : 'मोबाईल नंबर'}
                 </label>
                 <input
                   type="tel"
@@ -689,7 +693,7 @@ export default function DueMembersPage() {
 
               <div className="space-y-1">
                 <label className="block text-xs font-bold text-stone-700 font-devanagari">
-                  बाकी रक्कम (Due Amount) *
+                  {isEn ? 'Due Amount *' : 'बाकी रक्कम *'}
                 </label>
                 <input
                   type="number"
@@ -705,7 +709,7 @@ export default function DueMembersPage() {
             {/* Address */}
             <div className="space-y-1">
               <label className="block text-xs font-bold text-stone-700 font-devanagari">
-                पत्ता (Address)
+                {isEn ? 'Address' : 'पत्ता'}
               </label>
               <input
                 type="text"
@@ -718,7 +722,7 @@ export default function DueMembersPage() {
             {/* Notes */}
             <div className="space-y-1">
               <label className="block text-xs font-bold text-stone-700 font-devanagari">
-                टीप / शेरा
+                {isEn ? 'Notes' : 'टीप'}
               </label>
               <input
                 type="text"
@@ -735,7 +739,7 @@ export default function DueMembersPage() {
                 size="sm"
                 onClick={() => setEditPayment(null)}
               >
-                रद्द करा
+                {t('common.cancel')}
               </Button>
               <Button
                 type="submit"
@@ -744,14 +748,14 @@ export default function DueMembersPage() {
                 isLoading={isSubmittingEdit}
                 className="font-devanagari font-bold px-4"
               >
-                बदल सेव्ह करा
+                {isEn ? 'Save Changes' : 'बदल सेव्ह करा'}
               </Button>
             </div>
           </form>
         </Modal>
       )}
 
-      {/* 3. CANCEL DUE RECORD MODAL */}
+      {/* 3. DELETE DUE RECORD MODAL */}
       {cancelPayment && (
         <Modal
           isOpen={!!cancelPayment}
@@ -759,16 +763,17 @@ export default function DueMembersPage() {
           title={
             <div className="flex items-center gap-2 text-red-600 font-devanagari">
               <AlertTriangle className="w-5 h-5" />
-              <span>बाकी नोंद रद्द करा</span>
+              <span>{isEn ? 'Delete Due Record' : 'नोंद कायमस्वरूपी हटवा'}</span>
             </div>
           }
-          description="तुम्हाला ही बाकी नोंद रद्द करायची आहे का? ही नोंद सक्रिय यादीतून हटवली जाईल."
+          description={isEn ? 'Are you sure you want to delete this record? This action cannot be undone.' : 'तुम्हाला खात्री आहे का की तुम्हाला ही नोंद हटवायची आहे? ही कृती कायमस्वरूपी आहे.'}
           maxWidth="sm"
         >
           <div className="space-y-4 pt-2">
             <div className="p-3.5 bg-red-50 rounded-xl border border-red-200 text-xs text-red-900 space-y-1 font-devanagari">
-              <div><strong>देणगीदार:</strong> {cancelPayment.donorName}</div>
-              <div><strong>बाकी रक्कम:</strong> ₹{cancelPayment.expectedAmount}</div>
+              <div><strong>{isEn ? 'Receipt #:' : 'पावती क्र.:'}</strong> #{cancelPayment.receiptNumber || '-'}</div>
+              <div><strong>{isEn ? 'Donor:' : 'देणगीदार:'}</strong> {cancelPayment.donorName}</div>
+              <div><strong>{isEn ? 'Due Amount:' : 'बाकी रक्कम:'}</strong> ₹{cancelPayment.expectedAmount}</div>
             </div>
 
             <div className="flex items-center justify-end gap-2 pt-2">
@@ -778,7 +783,7 @@ export default function DueMembersPage() {
                 size="sm"
                 onClick={() => setCancelPayment(null)}
               >
-                रद्द करा (Cancel)
+                {t('common.cancel')}
               </Button>
               <Button
                 type="button"
@@ -788,7 +793,7 @@ export default function DueMembersPage() {
                 onClick={handleConfirmCancel}
                 className="font-devanagari font-bold"
               >
-                होय, नोंद रद्द करा
+                {isEn ? 'Delete Record' : 'होय, नोंद हटवा'}
               </Button>
             </div>
           </div>

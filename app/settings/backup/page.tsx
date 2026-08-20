@@ -16,9 +16,12 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Button } from '@/components/ui/Button';
 import { Modal } from '@/components/ui/Modal';
 import { useAppMode } from '@/lib/context/mode-context';
+import { useLanguage } from '@/lib/context/language-context';
 
 export default function BackupSettingsPage() {
   const { mode, user } = useAppMode();
+  const { language, t } = useLanguage();
+  const isEn = language === 'en';
   const isSuperAdmin = user?.role === 'SUPER_ADMIN';
 
   // 1. Test Data Clear Modal State
@@ -48,7 +51,7 @@ export default function BackupSettingsPage() {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    if (!confirm('बॅकअप रिस्टोअर केल्याने सध्याचा डेटा बदलला जाईल. पुढे जायचे का?')) return;
+    if (!confirm(isEn ? 'Restoring backup will replace current data. Continue?' : 'बॅकअप रिस्टोअर केल्याने सध्याचा डेटा बदलला जाईल. पुढे जायचे का?')) return;
 
     setIsRestoring(true);
     setRestoreMessage('');
@@ -64,12 +67,12 @@ export default function BackupSettingsPage() {
       });
 
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'बॅकअप रिस्टोअर करण्यात अडचण आली.');
+      if (!res.ok) throw new Error(data.error || (isEn ? 'Failed to restore backup.' : 'बॅकअप रिस्टोअर करण्यात अडचण आली.'));
 
-      setRestoreMessage('डेटा यशस्वीरीत्या रिस्टोअर झाला आहे!');
+      setRestoreMessage(isEn ? 'Data restored successfully!' : 'डेटा यशस्वीरीत्या रिस्टोअर झाला आहे!');
       setTimeout(() => setRestoreMessage(''), 4000);
     } catch (err: any) {
-      alert(err.message || 'अवैध बॅकअप फाईल किंवा त्रुटी.');
+      alert(err.message || (isEn ? 'Invalid backup file or error.' : 'अवैध बॅकअप फाईल किंवा त्रुटी.'));
     } finally {
       setIsRestoring(false);
       e.target.value = '';
@@ -79,7 +82,7 @@ export default function BackupSettingsPage() {
   const handleClearTestData = async (e: React.FormEvent) => {
     e.preventDefault();
     if (confirmationInput !== 'CLEAR_ALL_TEST_DATA') {
-      setClearError('कृपया अचूक शब्द टाईप करा: CLEAR_ALL_TEST_DATA');
+      setClearError(isEn ? 'Please type exact phrase: CLEAR_ALL_TEST_DATA' : 'कृपया अचूक शब्द टाईप करा: CLEAR_ALL_TEST_DATA');
       return;
     }
 
@@ -94,14 +97,14 @@ export default function BackupSettingsPage() {
       });
 
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'चाचणी डेटा हटवण्यात त्रुटी आली.');
+      if (!res.ok) throw new Error(data.error || (isEn ? 'Failed to clear test data.' : 'चाचणी डेटा हटवण्यात त्रुटी आली.'));
 
-      setClearResult(data.message || 'सर्व चाचणी डेटा हटवला गेला.');
+      setClearResult(data.message || (isEn ? 'All test data cleared.' : 'सर्व चाचणी डेटा हटवला गेला.'));
       setIsClearModalOpen(false);
       setConfirmationInput('');
       setTimeout(() => setClearResult(null), 5000);
     } catch (err: any) {
-      setClearError(err.message || 'त्रुटी आली.');
+      setClearError(err.message || (isEn ? 'Error occurred.' : 'त्रुटी आली.'));
     } finally {
       setIsClearing(false);
     }
@@ -110,13 +113,12 @@ export default function BackupSettingsPage() {
   // Handle Full Live Data Reset
   const handleResetSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (resetConfirmationInput !== 'RESET') {
-      setResetError('कृपया अचूक शब्द टाईप करा: RESET');
+    if (resetConfirmationInput !== 'RESET' && resetConfirmationInput !== 'DELETE ALL DATA') {
+      setResetError(isEn ? 'Please type exact phrase: RESET' : 'कृपया अचूक शब्द टाईप करा: RESET');
       return;
     }
 
     if (!isResetSecondStep) {
-      // Move to step 2 confirmation
       setIsResetSecondStep(true);
       return;
     }
@@ -132,15 +134,15 @@ export default function BackupSettingsPage() {
       });
 
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'डेटा रीसेट करताना त्रुटी आली.');
+      if (!res.ok) throw new Error(data.error || (isEn ? 'Failed to reset live data.' : 'डेटा रीसेट करताना त्रुटी आली.'));
 
-      setResetResult(data.message || 'सर्व मूळ डेटा यशस्वीरीत्या रीसेट झाला.');
+      setResetResult(data.message || (isEn ? 'All live data successfully reset.' : 'सर्व मूळ डेटा यशस्वीरीत्या रीसेट झाला.'));
       setIsResetModalOpen(false);
       setResetConfirmationInput('');
       setIsResetSecondStep(false);
       setTimeout(() => setResetResult(null), 5000);
     } catch (err: any) {
-      setResetError(err.message || 'त्रुटी आली.');
+      setResetError(err.message || (isEn ? 'Error occurred.' : 'त्रुटी आली.'));
     } finally {
       setIsResetting(false);
     }
@@ -152,10 +154,12 @@ export default function BackupSettingsPage() {
       <div className="border-b border-stone-200 pb-4">
         <h1 className="text-xl sm:text-2xl font-black font-devanagari text-stone-900 flex items-center gap-2">
           <Database className="w-6 h-6 text-orange-600" />
-          <span>डेटा बॅकअप व डेटा व्यवस्थापन (Backup & Reset)</span>
+          <span>{isEn ? 'Data Backup and Reset Management' : 'डेटा बॅकअप व डेटा व्यवस्थापन'}</span>
         </h1>
         <p className="text-xs text-stone-500 font-devanagari">
-          मंडळाचा संपूर्ण डेटा एका क्लिकवर डाऊनलोड करा, रिस्टोअर करा किंवा चाचणी / मूळ डेटा पूर्णपणे स्वच्छ करा.
+          {isEn
+            ? 'Download backups, restore previous data, or reset system database.'
+            : 'मंडळाचा संपूर्ण डेटा एका क्लिकवर डाऊनलोड करा, रिस्टोअर करा किंवा चाचणी व मूळ डेटा स्वच्छ करा.'}
         </p>
       </div>
 
@@ -185,10 +189,12 @@ export default function BackupSettingsPage() {
         <CardHeader className="bg-amber-50/50">
           <CardTitle className="text-base font-bold text-stone-900 font-devanagari flex items-center gap-2">
             <Download className="w-5 h-5 text-orange-600" />
-            <span>१. संपूर्ण डेटा बॅकअप डाऊनलोड करा (Export JSON)</span>
+            <span>{isEn ? '1. Export Complete Database Backup' : '१. संपूर्ण डेटा बॅकअप डाऊनलोड करा'}</span>
           </CardTitle>
           <CardDescription className="text-xs text-stone-500 font-devanagari">
-            मंडळाची माहिती, सर्व देणगीदार, जमा पावत्या, बाकी यादी व ऑडिट लॉग्ज JSON फाईल स्वरूपात सुरक्षितपणे डाऊनलोड करा.
+            {isEn
+              ? 'Download all receipts, donors, settings, and logs as a single secure JSON backup file.'
+              : 'मंडळाची माहिती, सर्व देणगीदार, जमा पावत्या, बाकी यादी व ऑडिट लॉग्ज JSON फाईल स्वरूपात डाऊनलोड करा.'}
           </CardDescription>
         </CardHeader>
         <CardContent className="p-6">
@@ -198,7 +204,7 @@ export default function BackupSettingsPage() {
             className="font-devanagari flex items-center gap-2 py-3 px-6 shadow font-bold"
           >
             <Download className="w-4 h-4" />
-            <span>संपूर्ण डेटाबेस डाऊनलोड करा (Export JSON)</span>
+            <span>{isEn ? 'Download Backup File' : 'संपूर्ण डेटाबेस डाऊनलोड करा'}</span>
           </Button>
         </CardContent>
       </Card>
@@ -208,16 +214,18 @@ export default function BackupSettingsPage() {
         <CardHeader className="bg-amber-50/50">
           <CardTitle className="text-base font-bold text-stone-900 font-devanagari flex items-center gap-2">
             <Upload className="w-5 h-5 text-blue-600" />
-            <span>२. डेटा बॅकअप रिस्टोअर करा (Import Backup)</span>
+            <span>{isEn ? '2. Restore Backup File' : '२. डेटा बॅकअप रिस्टोअर करा'}</span>
           </CardTitle>
           <CardDescription className="text-xs text-stone-500 font-devanagari">
-            पूर्वी डाऊनलोड केलेली JSON बॅकअप फाईल अपलोड करून डेटा पूर्ववत करा.
+            {isEn
+              ? 'Upload a previously saved JSON backup file to restore database records.'
+              : 'पूर्वी डाऊनलोड केलेली JSON बॅकअप फाईल अपलोड करून डेटा पूर्ववत करा.'}
           </CardDescription>
         </CardHeader>
         <CardContent className="p-6 space-y-3">
           <label className="inline-flex items-center gap-2 px-5 py-2.5 bg-white hover:bg-stone-50 text-stone-800 border border-stone-300 rounded-xl text-xs font-bold font-devanagari cursor-pointer shadow-sm">
             <Upload className="w-4 h-4 text-blue-600" />
-            <span>{isRestoring ? 'रिस्टोअर होत आहे...' : 'बॅकअप JSON फाईल निवडा'}</span>
+            <span>{isRestoring ? (isEn ? 'Restoring...' : 'रिस्टोअर होत आहे...') : (isEn ? 'Select Backup JSON File' : 'बॅकअप JSON फाईल निवडा')}</span>
             <input
               type="file"
               accept=".json"
@@ -234,15 +242,19 @@ export default function BackupSettingsPage() {
         <CardHeader className="bg-amber-100/60">
           <CardTitle className="text-base font-bold text-amber-950 font-devanagari flex items-center gap-2">
             <Trash2 className="w-5 h-5 text-amber-700" />
-            <span>३. चाचणी डेटा स्वच्छ करा (Clear All Test Data)</span>
+            <span>{isEn ? '3. Clear Test Data' : '३. चाचणी डेटा स्वच्छ करा'}</span>
           </CardTitle>
           <CardDescription className="text-xs text-amber-800 font-devanagari">
-            विकास किंवा चाचणी दरम्यान तयार केलेला सर्व खोटा (Test) डेटा नष्ट करा. मूळ (Live) डेटा १००% सुरक्षित राहील.
+            {isEn
+              ? 'Clear demo records created in Test Mode without touching Live records.'
+              : 'चाचणी दरम्यान तयार केलेला सर्व खोटा डेटा नष्ट करा. मूळ डेटा सुरक्षित राहील.'}
           </CardDescription>
         </CardHeader>
         <CardContent className="p-6 space-y-3">
           <p className="text-xs text-stone-700 font-devanagari">
-            हा पर्याय फक्त <strong>TEST MODE</strong> मधील पावत्या, देणगीदार आणि काउंटर साफ करतो. मंडळाचे मूळ कलेक्शन याने नष्ट होत नाही.
+            {isEn
+              ? 'This action only deletes receipts and donors created in Test Mode.'
+              : 'हा पर्याय फक्त चाचणी मोडमधील पावत्या, देणगीदार आणि काउंटर साफ करतो.'}
           </p>
           <Button
             variant="outline"
@@ -254,7 +266,7 @@ export default function BackupSettingsPage() {
             className="font-devanagari flex items-center gap-2 font-bold py-2.5 px-5 shadow border-amber-400 bg-white hover:bg-amber-50 text-amber-900"
           >
             <Trash2 className="w-4 h-4 text-amber-700" />
-            <span>सर्व चाचणी डेटा हटवा (Clear Test Data)</span>
+            <span>{isEn ? 'Clear Test Data' : 'सर्व चाचणी डेटा हटवा'}</span>
           </Button>
         </CardContent>
       </Card>
@@ -265,15 +277,19 @@ export default function BackupSettingsPage() {
           <CardHeader className="bg-red-100/80">
             <CardTitle className="text-base font-bold text-red-950 font-devanagari flex items-center gap-2">
               <Flame className="w-5 h-5 text-red-600" />
-              <span>४. संपूर्ण डेटा रीसेट करा (Complete Live Data Reset - Super Admin Only)</span>
+              <span>{isEn ? '4. Complete Live Data Reset (Super Admin Only)' : '४. संपूर्ण डेटा रीसेट करा'}</span>
             </CardTitle>
             <CardDescription className="text-xs text-red-900 font-devanagari">
-              अत्यंत धोक्याची कृती: याने मूळ (Live) मधील सर्व पावत्या, देणगीदार आणि बाकी यादी शून्य केली जाईल.
+              {isEn
+                ? 'High risk action: Clears all Live receipts, donors, and balances back to zero.'
+                : 'अत्यंत धोक्याची कृती: याने मूळ मधील सर्व पावत्या, देणगीदार आणि बाकी यादी शून्य केली जाईल.'}
             </CardDescription>
           </CardHeader>
           <CardContent className="p-6 space-y-3">
             <p className="text-xs text-stone-800 font-devanagari">
-              नवीन वर्षाच्या उत्सवाची सुरुवात नव्याने करण्यासाठी किंवा पूर्ण चाचणीनंतर सर्व जुना डेटा नष्ट करण्यासाठी हा पर्याय वापरावा.
+              {isEn
+                ? 'Use this when starting fresh for a new festival year after exporting your backups.'
+                : 'नवीन वर्षाच्या उत्सवाची सुरुवात नव्याने करण्यासाठी किंवा पूर्ण चाचणीनंतर सर्व जुना डेटा नष्ट करण्यासाठी हा पर्याय वापरावा.'}
             </p>
             <Button
               variant="danger"
@@ -286,7 +302,7 @@ export default function BackupSettingsPage() {
               className="font-devanagari flex items-center gap-2 font-bold py-2.5 px-5 shadow"
             >
               <Flame className="w-4 h-4" />
-              <span>संपूर्ण लाईव्ह डेटा रीसेट करा (Reset All Data)</span>
+              <span>{isEn ? 'Reset All Data' : 'संपूर्ण डेटा रीसेट करा'}</span>
             </Button>
           </CardContent>
         </Card>
@@ -299,10 +315,10 @@ export default function BackupSettingsPage() {
         title={
           <div className="flex items-center gap-2 text-amber-800 font-devanagari">
             <AlertTriangle className="w-5 h-5 text-amber-600" />
-            <span>चाचणी डेटा हटवण्याची पुष्टी करा</span>
+            <span>{isEn ? 'Confirm Clear Test Data' : 'चाचणी डेटा हटवण्याची पुष्टी करा'}</span>
           </div>
         }
-        description="हा निर्णय पूर्ववत करता येणार नाही. फक्त चाचणी डेटा नष्ट होईल."
+        description={isEn ? 'This action is irreversible. Only test records will be deleted.' : 'हा निर्णय पूर्ववत करता येणार नाही. फक्त चाचणी डेटा नष्ट होईल.'}
         maxWidth="md"
       >
         <form onSubmit={handleClearTestData} className="space-y-4 pt-1">
@@ -313,7 +329,7 @@ export default function BackupSettingsPage() {
           )}
 
           <div className="p-3.5 bg-stone-100 rounded-xl text-xs text-stone-700 font-devanagari space-y-1">
-            <p>पुष्टी करण्यासाठी खालील अक्षरे हुबेहूब टाईप करा:</p>
+            <p>{isEn ? 'Type the exact phrase below to confirm:' : 'पुष्टी करण्यासाठी खालील शब्द टाईप करा:'}</p>
             <div className="font-mono font-bold text-amber-900 bg-white p-2 rounded border border-stone-300 select-all">
               CLEAR_ALL_TEST_DATA
             </div>
@@ -332,7 +348,7 @@ export default function BackupSettingsPage() {
 
           <div className="pt-3 flex items-center justify-end gap-2 border-t border-stone-100">
             <Button type="button" variant="outline" size="sm" onClick={() => setIsClearModalOpen(false)}>
-              रद्द करा
+              {t('common.cancel')}
             </Button>
             <Button
               type="submit"
@@ -342,7 +358,7 @@ export default function BackupSettingsPage() {
               disabled={confirmationInput !== 'CLEAR_ALL_TEST_DATA'}
               className="font-devanagari font-bold bg-amber-600 hover:bg-amber-700"
             >
-              होय, चाचणी डेटा नष्ट करा
+              {isEn ? 'Clear Test Data' : 'होय, चाचणी डेटा नष्ट करा'}
             </Button>
           </div>
         </form>
@@ -359,11 +375,13 @@ export default function BackupSettingsPage() {
           <div className="flex items-center gap-2 text-red-600 font-devanagari">
             <Flame className="w-5 h-5" />
             <span>
-              {isResetSecondStep ? 'अंतिम पुष्टीकरण (Final Step)' : 'संपूर्ण डेटा रीसेट पुष्टीकरण'}
+              {isResetSecondStep
+                ? (isEn ? 'Final Confirmation' : 'अंतिम पुष्टीकरण')
+                : (isEn ? 'Confirm Complete Data Reset' : 'संपूर्ण डेटा रीसेट पुष्टीकरण')}
             </span>
           </div>
         }
-        description="चेतावणी: हा निर्णय कायमस्वरूपी आहे आणि पूर्ववत करता येणार नाही."
+        description={isEn ? 'Warning: This action is permanent and cannot be undone.' : 'चेतावणी: हा निर्णय कायमस्वरूपी आहे आणि पूर्ववत करता येणार नाही.'}
         maxWidth="md"
       >
         <form onSubmit={handleResetSubmit} className="space-y-4 pt-1">
@@ -377,18 +395,18 @@ export default function BackupSettingsPage() {
             <>
               <div className="p-3.5 bg-red-100 rounded-xl text-xs text-red-950 font-devanagari space-y-1.5 border border-red-300">
                 <p className="font-bold">
-                  ⚠️ तुम्ही मंडळाचा संपूर्ण LIVE डेटा हटवत आहात:
+                  {isEn ? '⚠️ You are about to wipe all LIVE data:' : '⚠️ तुम्ही मंडळाचा संपूर्ण LIVE डेटा हटवत आहात:'}
                 </p>
                 <ul className="list-disc pl-4 space-y-0.5 text-[11px]">
-                  <li>सर्व जमा पावत्या नष्ट होतील.</li>
-                  <li>सर्व देणगीदार आणि बाकी यादी शून्य होईल.</li>
-                  <li>पावती काउंटर क्रमांक १ वर रीसेट होईल.</li>
+                  <li>{isEn ? 'All recorded receipts will be permanently deleted.' : 'सर्व जमा पावत्या नष्ट होतील.'}</li>
+                  <li>{isEn ? 'All donors and pending balances will be cleared.' : 'सर्व देणगीदार आणि बाकी यादी शून्य होईल.'}</li>
+                  <li>{isEn ? 'Receipt counter will reset to 1.' : 'पावती काउंटर क्रमांक १ वर रीसेट होईल.'}</li>
                 </ul>
               </div>
 
               <div className="space-y-1">
                 <label className="block text-xs font-bold text-stone-700 font-devanagari">
-                  पुष्टी करण्यासाठी <strong>RESET</strong> टाईप करा:
+                  {isEn ? 'Type RESET to confirm:' : 'पुष्टी करण्यासाठी RESET टाईप करा:'}
                 </label>
                 <input
                   type="text"
@@ -402,16 +420,16 @@ export default function BackupSettingsPage() {
 
               <div className="pt-3 flex items-center justify-end gap-2 border-t border-stone-100">
                 <Button type="button" variant="outline" size="sm" onClick={() => setIsResetModalOpen(false)}>
-                  रद्द करा
+                  {t('common.cancel')}
                 </Button>
                 <Button
                   type="submit"
                   variant="danger"
                   size="sm"
-                  disabled={resetConfirmationInput !== 'RESET'}
+                  disabled={resetConfirmationInput !== 'RESET' && resetConfirmationInput !== 'DELETE ALL DATA'}
                   className="font-devanagari font-bold"
                 >
-                  पुढे जा (Proceed to Final Step) →
+                  {isEn ? 'Proceed to Final Step →' : 'पुढे जा →'}
                 </Button>
               </div>
             </>
@@ -419,10 +437,10 @@ export default function BackupSettingsPage() {
             <>
               <div className="p-4 bg-red-500 text-white rounded-xl text-xs font-devanagari space-y-2 shadow">
                 <div className="font-bold text-sm">
-                  🚨 तुम्ही १००% खात्रीने हा डेटा कायमचा नष्ट करू इच्छिता?
+                  {isEn ? '🚨 Are you 100% sure you want to permanently delete all data?' : '🚨 तुम्ही १००% खात्रीने हा डेटा कायमचा नष्ट करू इच्छिता?'}
                 </div>
                 <p className="text-[11px] opacity-90">
-                  कृपया "होय, सर्व डेटा कायमचा नष्ट करा" वर क्लिक करण्यापूर्वी बॅकअप डाऊनलोड केल्याची खात्री करा.
+                  {isEn ? 'Make sure you have exported and downloaded your backup before proceeding.' : 'कृपया पुढे जाण्यापूर्वी बॅकअप डाऊनलोड केल्याची खात्री करा.'}
                 </p>
               </div>
 
@@ -436,7 +454,7 @@ export default function BackupSettingsPage() {
                     setIsResetSecondStep(false);
                   }}
                 >
-                  रद्द करा (Cancel)
+                  {t('common.cancel')}
                 </Button>
                 <Button
                   type="submit"
@@ -445,7 +463,7 @@ export default function BackupSettingsPage() {
                   isLoading={isResetting}
                   className="font-devanagari font-bold bg-red-700 hover:bg-red-800"
                 >
-                  होय, सर्व डेटा कायमचा नष्ट करा (Confirm Reset)
+                  {isEn ? 'Confirm Full Reset' : 'होय, सर्व डेटा नष्ट करा'}
                 </Button>
               </div>
             </>

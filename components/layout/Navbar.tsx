@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import {
@@ -18,7 +18,7 @@ import {
   Sliders,
   Database,
   History,
-  Languages,
+  ChevronDown,
 } from 'lucide-react';
 import { useAppMode } from '@/lib/context/mode-context';
 import { useLanguage } from '@/lib/context/language-context';
@@ -36,6 +36,24 @@ export function Navbar({ mandalName = 'मोरया गणेशोत्स�
   const { language, setLanguage, t } = useLanguage();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const [isManagementOpen, setIsManagementOpen] = useState(false);
+  const managementRef = useRef<HTMLDivElement>(null);
+
+  // Close management dropdown on outside click
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (
+        managementRef.current &&
+        !managementRef.current.contains(event.target as Node)
+      ) {
+        setIsManagementOpen(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
 
   const handleLogout = async () => {
     try {
@@ -61,7 +79,8 @@ export function Navbar({ mandalName = 'मोरया गणेशोत्स�
     { href: '/payments', label: t('nav.ledger'), icon: CreditCard },
   ];
 
-  const adminNavItems = [
+  // Super Admin items
+  const superAdminNavItems = [
     { href: '/settings/mandal', label: t('nav.mandalSettings'), icon: Sliders },
     { href: '/settings/users', label: t('nav.hostManagement'), icon: Users },
     { href: '/settings/backup', label: t('nav.backupData'), icon: Database },
@@ -69,21 +88,28 @@ export function Navbar({ mandalName = 'मोरया गणेशोत्स�
     { href: '/audit-log', label: t('nav.auditLog'), icon: History },
   ];
 
+  // Host/Admin items
+  const hostNavItems = [
+    { href: '/announcements/manage', label: t('nav.announcementManage'), icon: Bell },
+  ];
+
+  const visibleAdminItems = isSuperAdmin ? superAdminNavItems : hostNavItems;
+
   return (
     <nav className="bg-white border-b border-amber-200/70 sticky top-0 z-40 shadow-sm">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
-          {/* Logo & Mandal Title (Identity name ALWAYS remains Marathi) */}
+          {/* Logo & Mandal Title (Identity name & address ALWAYS remain in Marathi) */}
           <Link href={isAuth ? '/dashboard' : '/'} className="flex items-center gap-2.5 group">
-            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-orange-500 to-amber-600 flex items-center justify-center text-white font-devanagari font-black text-xl shadow-md border-2 border-amber-300 group-hover:scale-105 transition-transform">
+            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-orange-500 to-amber-600 flex items-center justify-center text-white font-devanagari font-black text-xl shadow-md border-2 border-amber-300 group-hover:scale-105 transition-transform flex-shrink-0">
               ॐ
             </div>
             <div className="flex flex-col">
-              <span className="font-bold text-base sm:text-lg font-devanagari text-orange-950 tracking-tight leading-tight">
+              <span className="font-black text-sm sm:text-base font-devanagari text-orange-950 tracking-tight leading-tight">
                 {mandalName}
               </span>
-              <span className="text-[10px] text-amber-800 font-semibold tracking-wider uppercase">
-                {t('nav.digitalPavtiBook')}
+              <span className="text-[10px] text-amber-900 font-semibold font-devanagari tracking-wide">
+                तापडिया नगर अकोला 444001
               </span>
             </div>
           </Link>
@@ -114,28 +140,57 @@ export function Navbar({ mandalName = 'मोरया गणेशोत्स�
                   );
                 })}
 
-                {/* Super Admin Dropdown */}
-                {isSuperAdmin && (
-                  <div className="relative group">
-                    <button className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-stone-600 hover:bg-amber-50 hover:text-orange-900 transition-colors font-devanagari">
+                {/* Management Dropdown (Works for Admin & Super Admin) */}
+                {visibleAdminItems.length > 0 && (
+                  <div className="relative" ref={managementRef}>
+                    <button
+                      type="button"
+                      onClick={() => setIsManagementOpen(!isManagementOpen)}
+                      className={cn(
+                        'flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold font-devanagari transition-colors cursor-pointer',
+                        isManagementOpen || visibleAdminItems.some((i) => pathname === i.href)
+                          ? 'bg-amber-100/90 text-orange-950 font-bold border border-amber-300'
+                          : 'text-stone-600 hover:bg-amber-50 hover:text-orange-900'
+                      )}
+                    >
                       <Settings className="w-3.5 h-3.5 text-amber-700" />
                       <span>{t('nav.management')}</span>
+                      <ChevronDown
+                        className={cn(
+                          'w-3 h-3 text-stone-500 transition-transform duration-200',
+                          isManagementOpen ? 'rotate-180 text-orange-600' : ''
+                        )}
+                      />
                     </button>
-                    <div className="absolute right-0 mt-1 w-52 bg-white rounded-xl shadow-xl border border-stone-200 py-1.5 hidden group-hover:block animate-in fade-in-50">
-                      {adminNavItems.map((item) => {
-                        const Icon = item.icon;
-                        return (
-                          <Link
-                            key={item.href}
-                            href={item.href}
-                            className="flex items-center gap-2 px-4 py-2 text-xs text-stone-700 hover:bg-amber-50 hover:text-orange-900 font-devanagari"
-                          >
-                            <Icon className="w-3.5 h-3.5 text-amber-600" />
-                            <span>{item.label}</span>
-                          </Link>
-                        );
-                      })}
-                    </div>
+
+                    {/* Interactive Dropdown Menu */}
+                    {isManagementOpen && (
+                      <div className="absolute right-0 top-full mt-1.5 w-56 bg-white rounded-xl shadow-2xl border border-stone-200 py-2 z-50 animate-in fade-in-50 slide-in-from-top-1">
+                        <div className="px-3 py-1 text-[10px] font-bold text-stone-400 uppercase tracking-wider border-b border-stone-100 mb-1">
+                          {isSuperAdmin ? t('nav.superAdmin') : t('nav.management')}
+                        </div>
+                        {visibleAdminItems.map((item) => {
+                          const Icon = item.icon;
+                          const isActive = pathname === item.href;
+                          return (
+                            <Link
+                              key={item.href}
+                              href={item.href}
+                              onClick={() => setIsManagementOpen(false)}
+                              className={cn(
+                                'flex items-center gap-2.5 px-4 py-2 text-xs font-devanagari transition-colors',
+                                isActive
+                                  ? 'bg-amber-100/70 text-orange-950 font-bold'
+                                  : 'text-stone-700 hover:bg-amber-50 hover:text-orange-900'
+                              )}
+                            >
+                              <Icon className="w-3.5 h-3.5 text-amber-600 flex-shrink-0" />
+                              <span>{item.label}</span>
+                            </Link>
+                          );
+                        })}
+                      </div>
+                    )}
                   </div>
                 )}
               </>
@@ -225,7 +280,7 @@ export function Navbar({ mandalName = 'मोरया गणेशोत्स�
                   onClick={handleLogout}
                   disabled={isLoggingOut}
                   title={t('nav.logout')}
-                  className="p-1.5 text-stone-400 hover:text-red-600 rounded-lg hover:bg-red-50 transition-colors"
+                  className="p-1.5 text-stone-400 hover:text-red-600 rounded-lg hover:bg-red-50 transition-colors cursor-pointer"
                 >
                   <LogOut className="w-4 h-4" />
                 </button>
@@ -332,12 +387,12 @@ export function Navbar({ mandalName = 'मोरया गणेशोत्स�
                 );
               })}
 
-              {isSuperAdmin && (
+              {visibleAdminItems.length > 0 && (
                 <div className="pt-2 border-t border-stone-100 space-y-1">
                   <div className="text-[11px] font-bold uppercase text-stone-400 px-3 py-1">
                     {t('nav.management')}
                   </div>
-                  {adminNavItems.map((item) => {
+                  {visibleAdminItems.map((item) => {
                     const Icon = item.icon;
                     return (
                       <Link

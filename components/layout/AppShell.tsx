@@ -4,6 +4,7 @@ import React, { useEffect, useState } from 'react';
 import { ModeProvider } from '@/lib/context/mode-context';
 import { Navbar } from './Navbar';
 import { Footer } from './Footer';
+import { MobileBottomNav } from './MobileBottomNav';
 import { TestModeBanner } from './TestModeBanner';
 import { AuthSession, MandalSettings } from '@/types';
 
@@ -44,11 +45,13 @@ export function AppShell({ children, initialUser = null, initialSettings = null 
       <div className="min-h-screen flex flex-col bg-[#FFFDF9]">
         <TestModeBanner />
         <Navbar mandalName={settings?.mandalNameMarathi} />
-        <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
+        <main className="flex-1 max-w-7xl w-full mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-8 pb-24 md:pb-8">
           {children}
         </main>
         <Footer mandalName={settings?.mandalNameMarathi} />
+        <MobileBottomNav />
       </div>
     </ModeProvider>
   );
 }
+

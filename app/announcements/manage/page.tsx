@@ -22,7 +22,9 @@ import { Announcement } from '@/types';
 import { useLanguage } from '@/lib/context/language-context';
 
 export default function ManageAnnouncementsPage() {
-  const { language } = useLanguage();
+  const { language, t } = useLanguage();
+  const isEn = language === 'en';
+
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -114,7 +116,7 @@ export default function ManageAnnouncementsPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!titleMarathi.trim() || !contentMarathi.trim()) {
-      setFormError('शीर्षक आणि मजकूर आवश्यक आहे.');
+      setFormError(isEn ? 'Title and content are required.' : 'शीर्षक आणि मजकूर आवश्यक आहे.');
       return;
     }
 
@@ -140,19 +142,19 @@ export default function ManageAnnouncementsPage() {
       });
 
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'सूचना सेव्ह करण्यात अडचण आली.');
+      if (!res.ok) throw new Error(data.error || (isEn ? 'Failed to save announcement.' : 'सूचना सेव्ह करण्यात अडचण आली.'));
 
       setIsModalOpen(false);
       fetchAnnouncements();
     } catch (err: any) {
-      setFormError(err.message || 'त्रुटी आली.');
+      setFormError(err.message || (isEn ? 'Error occurred.' : 'त्रुटी आली.'));
     } finally {
       setIsSubmitting(false);
     }
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm('तुम्हाला ही सूचना कायमस्वरूपी हटवायची आहे का?')) return;
+    if (!confirm(isEn ? 'Are you sure you want to delete this announcement?' : 'तुम्हाला ही सूचना कायमस्वरूपी हटवायची आहे का?')) return;
     try {
       await fetch(`/api/announcements?id=${id}`, { method: 'DELETE' });
       fetchAnnouncements();
@@ -168,10 +170,12 @@ export default function ManageAnnouncementsPage() {
         <div>
           <h1 className="text-xl sm:text-2xl font-black font-devanagari text-stone-900 flex items-center gap-2">
             <Bell className="w-6 h-6 text-orange-600" />
-            <span>मंडळ सूचना व्यवस्थापन (Announcements CMS)</span>
+            <span>{isEn ? 'Announcement Management' : 'मंडळ सूचना व्यवस्थापन'}</span>
           </h1>
           <p className="text-xs text-stone-500 font-devanagari">
-            वेबसाईटवरील सूचना फलकावर प्रसिद्ध करण्यासाठी नवीन सूचना तयार करा, संपादित करा, प्रसिद्ध (Publish) किंवा अप्रकाशित करा.
+            {isEn
+              ? 'Create, edit, publish, or unpublish official announcements for the public notice board.'
+              : 'वेबसाईटवरील सूचना फलकावर प्रसिद्ध करण्यासाठी नवीन सूचना तयार करा, संपादित करा किंवा अप्रकाशित करा.'}
           </p>
         </div>
 
@@ -182,7 +186,7 @@ export default function ManageAnnouncementsPage() {
           className="font-devanagari flex items-center gap-1.5 shadow"
         >
           <Plus className="w-4 h-4" />
-          <span>+ नवीन सूचना जोडा</span>
+          <span>{isEn ? '+ Add New Announcement' : '+ नवीन सूचना जोडा'}</span>
         </Button>
       </div>
 
@@ -192,12 +196,17 @@ export default function ManageAnnouncementsPage() {
           <Card className="border-dashed border-stone-300">
             <CardContent className="p-12 text-center text-stone-400 font-devanagari space-y-2">
               <Bell className="w-10 h-10 mx-auto opacity-50" />
-              <div className="font-bold text-stone-700">कोणतीही सूचना उपलब्ध नाही.</div>
+              <div className="font-bold text-stone-700">
+                {isEn ? 'No announcements available.' : 'कोणतीही सूचना उपलब्ध नाही.'}
+              </div>
             </CardContent>
           </Card>
         ) : (
           announcements.map((item) => {
             const itemStatus = item.status || (item.active ? 'PUBLISHED' : 'DRAFT');
+            const displayTitle = isEn && item.titleEnglish ? item.titleEnglish : item.titleMarathi;
+            const displayContent = isEn && item.contentEnglish ? item.contentEnglish : item.contentMarathi;
+
             return (
               <Card key={item.id} className="border-stone-200 hover:border-amber-300 transition-colors shadow-sm">
                 <CardContent className="p-5 flex flex-col sm:flex-row sm:items-start justify-between gap-4">
@@ -215,16 +224,20 @@ export default function ManageAnnouncementsPage() {
                         }
                       >
                         {itemStatus === 'PUBLISHED'
-                          ? 'प्रसिद्ध (PUBLISHED)'
+                          ? (isEn ? 'Published' : 'प्रसिद्ध')
                           : itemStatus === 'DRAFT'
-                          ? 'मसुदा (DRAFT)'
+                          ? (isEn ? 'Draft' : 'मसुदा')
                           : itemStatus === 'UNPUBLISHED'
-                          ? 'अप्रकाशित (UNPUBLISHED)'
-                          : 'संग्रहित (ARCHIVED)'}
+                          ? (isEn ? 'Unpublished' : 'अप्रकाशित')
+                          : (isEn ? 'Archived' : 'संग्रहित')}
                       </Badge>
 
                       <Badge variant={item.priority === 'HIGH' ? 'danger' : 'gold'}>
-                        {item.priority === 'HIGH' ? 'महत्त्वाची' : item.priority === 'URGENT' ? 'तातडीची' : 'सामान्य'}
+                        {item.priority === 'HIGH'
+                          ? (isEn ? 'High Priority' : 'महत्त्वाची')
+                          : item.priority === 'URGENT'
+                          ? (isEn ? 'Urgent' : 'तातडीची')
+                          : (isEn ? 'Normal' : 'सामान्य')}
                       </Badge>
 
                       <span className="text-xs text-stone-400 font-mono">📅 {item.date}</span>
@@ -232,17 +245,17 @@ export default function ManageAnnouncementsPage() {
                     </div>
 
                     <h3 className="text-base font-bold text-stone-900 font-devanagari">
-                      {item.titleMarathi}
+                      {displayTitle}
                     </h3>
 
                     <p className="text-xs text-stone-600 font-devanagari line-clamp-2">
-                      {item.contentMarathi}
+                      {displayContent}
                     </p>
 
                     {item.venue && (
                       <div className="text-[11px] text-stone-500 font-devanagari flex items-center gap-1">
                         <MapPin className="w-3.5 h-3.5 text-orange-600" />
-                        <span>स्थान: {item.venue}</span>
+                        <span>{isEn ? 'Venue:' : 'स्थान:'} {item.venue}</span>
                       </div>
                     )}
                   </div>
@@ -253,26 +266,26 @@ export default function ManageAnnouncementsPage() {
                       <button
                         onClick={() => handleQuickStatusChange(item.id, 'PUBLISHED')}
                         className="px-2.5 py-1 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-300 rounded-lg text-xs font-bold font-devanagari flex items-center gap-1"
-                        title="प्रसिद्ध करा"
+                        title={isEn ? 'Publish' : 'प्रसिद्ध करा'}
                       >
                         <CheckCircle className="w-3.5 h-3.5" />
-                        <span>प्रसिद्ध करा</span>
+                        <span>{isEn ? 'Publish' : 'प्रसिद्ध करा'}</span>
                       </button>
                     ) : (
                       <button
                         onClick={() => handleQuickStatusChange(item.id, 'UNPUBLISHED')}
                         className="px-2.5 py-1 bg-amber-50 text-amber-800 hover:bg-amber-100 border border-amber-300 rounded-lg text-xs font-bold font-devanagari flex items-center gap-1"
-                        title="अप्रकाशित करा"
+                        title={isEn ? 'Unpublish' : 'अप्रकाशित करा'}
                       >
                         <EyeOff className="w-3.5 h-3.5" />
-                        <span>अप्रकाशित</span>
+                        <span>{isEn ? 'Unpublish' : 'अप्रकाशित करा'}</span>
                       </button>
                     )}
 
                     <button
                       onClick={() => setPreviewItem(item)}
                       className="p-1.5 text-stone-600 hover:text-orange-600 rounded-lg hover:bg-stone-100"
-                      title="पूर्वावलोकन पहा (Preview)"
+                      title={isEn ? 'Preview' : 'पूर्वावलोकन'}
                     >
                       <Eye className="w-4 h-4" />
                     </button>
@@ -280,7 +293,7 @@ export default function ManageAnnouncementsPage() {
                     <button
                       onClick={() => handleOpenEditModal(item)}
                       className="p-1.5 text-stone-600 hover:text-orange-600 rounded-lg hover:bg-stone-100"
-                      title="संपादित करा (Edit)"
+                      title={isEn ? 'Edit' : 'संपादित करा'}
                     >
                       <Edit2 className="w-4 h-4" />
                     </button>
@@ -288,7 +301,7 @@ export default function ManageAnnouncementsPage() {
                     <button
                       onClick={() => handleDelete(item.id)}
                       className="p-1.5 text-stone-400 hover:text-red-600 rounded-lg hover:bg-red-50"
-                      title="हटवा (Delete)"
+                      title={isEn ? 'Delete' : 'हटवा'}
                     >
                       <Trash2 className="w-4 h-4" />
                     </button>
@@ -304,7 +317,7 @@ export default function ManageAnnouncementsPage() {
       <Modal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
-        title={editingId ? 'सूचना संपादित करा' : 'नवीन सूचना तयार करा'}
+        title={editingId ? (isEn ? 'Edit Announcement' : 'सूचना संपादित करा') : (isEn ? 'Create Announcement' : 'नवीन सूचना तयार करा')}
         maxWidth="lg"
       >
         <form onSubmit={handleSubmit} className="space-y-4 pt-1">
@@ -317,26 +330,39 @@ export default function ManageAnnouncementsPage() {
           {/* Title */}
           <div className="space-y-1">
             <label className="block text-xs font-bold text-stone-700 font-devanagari">
-              सूचनेचे शीर्षक (मराठी) *
+              {isEn ? 'Announcement Title (Marathi) *' : 'सूचनेचे शीर्षक (मराठी) *'}
             </label>
             <input
               type="text"
               required
               value={titleMarathi}
               onChange={(e) => setTitleMarathi(e.target.value)}
-              placeholder="उदा. गणेश आगमन मिरवणूक व महाआरती"
+              placeholder={isEn ? 'e.g. Ganesh Aarti & Prasad' : 'उदा. गणेश आगमन मिरवणूक व महाआरती'}
               className="w-full px-3.5 py-2 border border-stone-300 rounded-lg text-xs font-devanagari font-bold"
+            />
+          </div>
+
+          <div className="space-y-1">
+            <label className="block text-xs font-bold text-stone-700 font-devanagari">
+              {isEn ? 'Announcement Title (English - Optional)' : 'सूचनेचे शीर्षक (इंग्रजी)'}
+            </label>
+            <input
+              type="text"
+              value={titleEnglish}
+              onChange={(e) => setTitleEnglish(e.target.value)}
+              placeholder={isEn ? 'e.g. Grand Ganesh Arrival Procession' : 'उदा. Grand Ganesh Arrival Procession'}
+              className="w-full px-3.5 py-2 border border-stone-300 rounded-lg text-xs"
             />
           </div>
 
           {/* Content */}
           <div className="space-y-1">
             <label className="block text-xs font-bold text-stone-700 font-devanagari">
-              सूचनेचा संपूर्ण मजकूर (मराठी) *
+              {isEn ? 'Announcement Details (Marathi) *' : 'सूचनेचा संपूर्ण मजकूर (मराठी) *'}
             </label>
             <textarea
               required
-              rows={4}
+              rows={3}
               value={contentMarathi}
               onChange={(e) => setContentMarathi(e.target.value)}
               placeholder="सर्व भाविक भक्तांनी..."
@@ -344,11 +370,24 @@ export default function ManageAnnouncementsPage() {
             />
           </div>
 
+          <div className="space-y-1">
+            <label className="block text-xs font-bold text-stone-700 font-devanagari">
+              {isEn ? 'Announcement Details (English - Optional)' : 'सूचनेचा संपूर्ण मजकूर (इंग्रजी)'}
+            </label>
+            <textarea
+              rows={3}
+              value={contentEnglish}
+              onChange={(e) => setContentEnglish(e.target.value)}
+              placeholder={isEn ? 'All devotees are cordially invited...' : 'All devotees are cordially invited...'}
+              className="w-full px-3.5 py-2 border border-stone-300 rounded-lg text-xs"
+            />
+          </div>
+
           {/* Date, Time, Venue Grid */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div className="space-y-1">
               <label className="block text-xs font-bold text-stone-700 font-devanagari">
-                दिनांक (Date)
+                {isEn ? 'Date' : 'दिनांक'}
               </label>
               <input
                 type="date"
@@ -360,26 +399,26 @@ export default function ManageAnnouncementsPage() {
 
             <div className="space-y-1">
               <label className="block text-xs font-bold text-stone-700 font-devanagari">
-                वेळ (Time - ऐच्छिक)
+                {isEn ? 'Time (Optional)' : 'वेळ'}
               </label>
               <input
                 type="text"
                 value={time}
                 onChange={(e) => setTime(e.target.value)}
-                placeholder="उदा. सायं. ७:३०"
+                placeholder={isEn ? 'e.g. 7:30 PM' : 'उदा. सायं. ७:३०'}
                 className="w-full px-3 py-2 border border-stone-300 rounded-lg text-xs font-devanagari"
               />
             </div>
 
             <div className="space-y-1">
               <label className="block text-xs font-bold text-stone-700 font-devanagari">
-                स्थान / पत्ता (Venue)
+                {isEn ? 'Location / Venue' : 'स्थान / पत्ता'}
               </label>
               <input
                 type="text"
                 value={venue}
                 onChange={(e) => setVenue(e.target.value)}
-                placeholder="उदा. मंडळ मुख्य मंडप"
+                placeholder={isEn ? 'e.g. Main Mandap' : 'उदा. मंडळ मुख्य मंडप'}
                 className="w-full px-3 py-2 border border-stone-300 rounded-lg text-xs font-devanagari"
               />
             </div>
@@ -389,42 +428,42 @@ export default function ManageAnnouncementsPage() {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
             <div className="space-y-1">
               <label className="block text-xs font-bold text-stone-700 font-devanagari">
-                प्राधान्य (Priority)
+                {isEn ? 'Priority' : 'प्राधान्य'}
               </label>
               <select
                 value={priority}
                 onChange={(e) => setPriority(e.target.value as any)}
                 className="w-full px-3 py-2 border border-stone-300 rounded-lg text-xs font-devanagari"
               >
-                <option value="NORMAL">सामान्य (Normal)</option>
-                <option value="HIGH">महत्त्वाची (High)</option>
-                <option value="URGENT">तातडीची (Urgent)</option>
+                <option value="NORMAL">{isEn ? 'Normal' : 'सामान्य'}</option>
+                <option value="HIGH">{isEn ? 'High Priority' : 'महत्त्वाची'}</option>
+                <option value="URGENT">{isEn ? 'Urgent' : 'तातडीची'}</option>
               </select>
             </div>
 
             <div className="space-y-1">
               <label className="block text-xs font-bold text-stone-700 font-devanagari">
-                स्थिती (Publication Status)
+                {isEn ? 'Publication Status' : 'स्थिती'}
               </label>
               <select
                 value={status}
                 onChange={(e) => setStatus(e.target.value as any)}
                 className="w-full px-3 py-2 border border-stone-300 rounded-lg text-xs font-devanagari font-bold"
               >
-                <option value="PUBLISHED">🟢 प्रसिद्ध करा (PUBLISHED - Live)</option>
-                <option value="DRAFT">⚪ मसुदा ठेवा (DRAFT)</option>
-                <option value="UNPUBLISHED">🟡 अप्रकाशित (UNPUBLISHED)</option>
-                <option value="ARCHIVED">🔴 संग्रहित (ARCHIVED)</option>
+                <option value="PUBLISHED">{isEn ? 'Published (Live)' : 'प्रसिद्ध करा'}</option>
+                <option value="DRAFT">{isEn ? 'Draft' : 'मसुदा ठेवा'}</option>
+                <option value="UNPUBLISHED">{isEn ? 'Unpublished' : 'अप्रकाशित'}</option>
+                <option value="ARCHIVED">{isEn ? 'Archived' : 'संग्रहित'}</option>
               </select>
             </div>
           </div>
 
           <div className="pt-3 flex items-center justify-end gap-2 border-t border-stone-100">
             <Button type="button" variant="outline" size="sm" onClick={() => setIsModalOpen(false)}>
-              रद्द करा
+              {t('common.cancel')}
             </Button>
             <Button type="submit" variant="primary" size="sm" isLoading={isSubmitting} className="font-devanagari font-bold px-4">
-              सेव्ह करा
+              {t('common.save')}
             </Button>
           </div>
         </form>
@@ -435,24 +474,26 @@ export default function ManageAnnouncementsPage() {
         <Modal
           isOpen={!!previewItem}
           onClose={() => setPreviewItem(null)}
-          title="सूचना पूर्वावलोकन (Announcement Preview)"
+          title={isEn ? 'Announcement Preview' : 'सूचना पूर्वावलोकन'}
           maxWidth="md"
         >
           <div className="p-4 bg-amber-50 border border-amber-300 rounded-2xl space-y-3 font-devanagari">
             <div className="flex items-center justify-between text-xs text-stone-500">
               <span className="font-bold text-orange-800 uppercase tracking-wider">
-                महत्त्वाची सूचना
+                {isEn ? 'Official Notice' : 'महत्त्वाची सूचना'}
               </span>
               <span>📅 {previewItem.date} {previewItem.time && `• ⏰ ${previewItem.time}`}</span>
             </div>
-            <h3 className="text-lg font-bold text-stone-900">{previewItem.titleMarathi}</h3>
+            <h3 className="text-lg font-bold text-stone-900">
+              {isEn && previewItem.titleEnglish ? previewItem.titleEnglish : previewItem.titleMarathi}
+            </h3>
             <p className="text-xs sm:text-sm text-stone-700 leading-relaxed whitespace-pre-wrap">
-              {previewItem.contentMarathi}
+              {isEn && previewItem.contentEnglish ? previewItem.contentEnglish : previewItem.contentMarathi}
             </p>
             {previewItem.venue && (
               <div className="text-xs text-amber-900 font-semibold pt-1 flex items-center gap-1">
                 <MapPin className="w-3.5 h-3.5 text-orange-600" />
-                <span>स्थान: {previewItem.venue}</span>
+                <span>{isEn ? 'Venue:' : 'स्थान:'} {previewItem.venue}</span>
               </div>
             )}
           </div>

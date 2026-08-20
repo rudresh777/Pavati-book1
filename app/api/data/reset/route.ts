@@ -20,9 +20,9 @@ export async function POST(request: Request) {
     const body = await request.json();
     const { confirmation, mode = 'LIVE' } = body;
 
-    if (confirmation !== 'RESET') {
+    if (confirmation !== 'RESET' && confirmation !== 'DELETE ALL DATA') {
       return NextResponse.json(
-        { error: 'कृपया अचूक शब्द टाईप करा: RESET' },
+        { error: 'कृपया अचूक शब्द टाईप करा: DELETE ALL DATA' },
         { status: 400 }
       );
     }

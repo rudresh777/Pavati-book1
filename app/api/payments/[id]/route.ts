@@ -134,9 +134,13 @@ export async function DELETE(
     const storage = getStorageProvider();
     await storage.init();
 
-    // Soft delete (Status = CANCELLED) to preserve financial history
-    const cancelled = await storage.cancelPendingPayment(id, mode);
-    return NextResponse.json({ success: true, payment: cancelled });
+    const result = await storage.deletePayment(id, mode, {
+      userId: session.userId,
+      userName: session.name,
+      userRole: session.role,
+    });
+
+    return NextResponse.json({ success: true, deletedPayment: result.deletedPayment });
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }

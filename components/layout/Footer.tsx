@@ -12,12 +12,15 @@ export function Footer({ mandalName = 'मोरया गणेशोत्स�
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="flex flex-col md:flex-row items-center justify-between gap-4 text-center md:text-left">
           <div className="space-y-1">
-            <div className="flex items-center justify-center md:justify-start gap-2 text-amber-500 font-devanagari font-bold text-sm">
+            <div className="flex items-center justify-center md:justify-start gap-2 text-amber-400 font-devanagari font-bold text-sm">
               <span>॥ गणपती बाप्पा मोरया ॥</span>
               <span>•</span>
               <span>॥ मंगलमूर्ती मोरया ॥</span>
             </div>
-            <p className="text-xs text-stone-400">
+            <p className="text-xs text-stone-300 font-devanagari">
+              {mandalName} • तापडिया नगर अकोला 444001
+            </p>
+            <p className="text-[11px] text-stone-500 font-mono">
               © {new Date().getFullYear()} {mandalName}. All rights reserved.
             </p>
           </div>

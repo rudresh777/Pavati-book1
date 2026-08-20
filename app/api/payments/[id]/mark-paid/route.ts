@@ -28,6 +28,8 @@ export async function POST(
       return NextResponse.json({ error: 'प्राप्त रक्कम ₹१ पेक्षा जास्त असावी.' }, { status: 400 });
     }
 
+    const selectedMethod: 'CASH' | 'UPI' = paymentMethod === 'UPI' ? 'UPI' : 'CASH';
+
     const storage = getStorageProvider();
     await storage.init();
 
@@ -35,7 +37,7 @@ export async function POST(
       id,
       {
         receivedAmount: numReceived,
-        paymentMethod: paymentMethod as PaymentMethod,
+        paymentMethod: selectedMethod,
         transactionReference: transactionReference?.trim(),
         notes: notes?.trim(),
         hostId: session.userId,

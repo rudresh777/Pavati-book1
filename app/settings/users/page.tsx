@@ -7,8 +7,12 @@ import { Button } from '@/components/ui/Button';
 import { Modal } from '@/components/ui/Modal';
 import { Badge } from '@/components/ui/Badge';
 import { User, UserRole } from '@/types';
+import { useLanguage } from '@/lib/context/language-context';
 
 export default function UsersManagementPage() {
+  const { language, t } = useLanguage();
+  const isEn = language === 'en';
+
   const [users, setUsers] = useState<User[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -52,7 +56,7 @@ export default function UsersManagementPage() {
   const handleCreateUser = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim() || !email.trim() || !password.trim()) {
-      setFormError('नाव, ईमेल आणि पासवर्ड आवश्यक आहे.');
+      setFormError(isEn ? 'Name, email, and password are required.' : 'नाव, ईमेल आणि पासवर्ड आवश्यक आहे.');
       return;
     }
 
@@ -73,27 +77,27 @@ export default function UsersManagementPage() {
       });
 
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'वापरकर्ता तयार करण्यात त्रुटी आली.');
+      if (!res.ok) throw new Error(data.error || (isEn ? 'Failed to create user account.' : 'वापरकर्ता तयार करण्यात त्रुटी आली.'));
 
       setIsModalOpen(false);
       fetchUsers();
     } catch (err: any) {
-      setFormError(err.message || 'काहीतरी त्रुटी आली.');
+      setFormError(err.message || (isEn ? 'Something went wrong.' : 'काहीतरी त्रुटी आली.'));
     } finally {
       setIsSubmitting(false);
     }
   };
 
   const handleDeleteUser = async (id: string, userName: string) => {
-    if (!confirm(`तुम्हाला खात्री आहे का की "${userName}" हे खाते हटवायचे आहे?`)) return;
+    if (!confirm(isEn ? `Are you sure you want to delete "${userName}" account?` : `तुम्हाला खात्री आहे का की "${userName}" हे खाते हटवायचे आहे?`)) return;
 
     try {
       const res = await fetch(`/api/users?id=${id}`, { method: 'DELETE' });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'वापरकर्ता हटवण्यात अडचण आली.');
+      if (!res.ok) throw new Error(data.error || (isEn ? 'Failed to delete user.' : 'वापरकर्ता हटवण्यात अडचण आली.'));
       fetchUsers();
     } catch (err: any) {
-      alert(err.message || 'त्रुटी आली.');
+      alert(err.message || (isEn ? 'Error occurred.' : 'त्रुटी आली.'));
     }
   };
 
@@ -104,10 +108,12 @@ export default function UsersManagementPage() {
         <div>
           <h1 className="text-xl sm:text-2xl font-black font-devanagari text-stone-900 flex items-center gap-2">
             <Users className="w-6 h-6 text-orange-600" />
-            <span>मंडळ प्रतिनिधी व्यवस्थापन (Host Management)</span>
+            <span>{isEn ? 'Host & User Management' : 'मंडळ प्रतिनिधी व्यवस्थापन'}</span>
           </h1>
           <p className="text-xs text-stone-500 font-devanagari">
-            पावती फाडण्यासाठी अधिकृत मंडळ प्रतिनिधी (Hosts) व सुपर ॲडमिन खाती जोडा किंवा व्यवस्थापित करा.
+            {isEn
+              ? 'Add or manage authorized hosts and administrator accounts for receipt generation.'
+              : 'पावती तयार करण्यासाठी अधिकृत मंडळ प्रतिनिधी व सुपर ॲडमिन खाती जोडा किंवा व्यवस्थापित करा.'}
           </p>
         </div>
 
@@ -118,7 +124,7 @@ export default function UsersManagementPage() {
           className="font-devanagari flex items-center gap-1.5 shadow"
         >
           <Plus className="w-4 h-4" />
-          <span>+ नवीन प्रतिनिधी जोडा</span>
+          <span>{isEn ? '+ Add New Host' : '+ नवीन प्रतिनिधी जोडा'}</span>
         </Button>
       </div>
 
@@ -127,11 +133,11 @@ export default function UsersManagementPage() {
         <table className="w-full text-left text-xs text-stone-700">
           <thead className="bg-stone-50 text-stone-600 font-bold border-b border-stone-200 uppercase font-devanagari">
             <tr>
-              <th className="px-4 py-3">नाव</th>
-              <th className="px-4 py-3">ईमेल / संपर्क</th>
-              <th className="px-4 py-3">भूमिका (Role)</th>
-              <th className="px-4 py-3">स्थिती</th>
-              <th className="px-4 py-3 text-right">कृती</th>
+              <th className="px-4 py-3">{isEn ? 'Name' : 'नाव'}</th>
+              <th className="px-4 py-3">{isEn ? 'Email / Contact' : 'ईमेल / संपर्क'}</th>
+              <th className="px-4 py-3">{isEn ? 'Role' : 'भूमिका'}</th>
+              <th className="px-4 py-3">{isEn ? 'Status' : 'स्थिती'}</th>
+              <th className="px-4 py-3 text-right">{isEn ? 'Actions' : 'कृती'}</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-stone-100">
@@ -146,17 +152,21 @@ export default function UsersManagementPage() {
                 </td>
                 <td className="px-4 py-3">
                   <Badge variant={u.role === 'SUPER_ADMIN' ? 'gold' : 'info'}>
-                    {u.role === 'SUPER_ADMIN' ? '👑 सुपर ॲडमिन' : '🚩 प्रतिनिधी (Host)'}
+                    {u.role === 'SUPER_ADMIN'
+                      ? (isEn ? 'Super Admin' : 'सुपर ॲडमिन')
+                      : (isEn ? 'Host' : 'मंडळ प्रतिनिधी')}
                   </Badge>
                 </td>
                 <td className="px-4 py-3">
-                  <span className="text-emerald-700 font-bold">सक्रिय</span>
+                  <span className="text-emerald-700 font-bold">
+                    {isEn ? 'Active' : 'सक्रिय'}
+                  </span>
                 </td>
                 <td className="px-4 py-3 text-right">
                   <button
                     onClick={() => handleDeleteUser(u.id, u.name)}
                     className="p-1.5 text-stone-400 hover:text-red-600 rounded hover:bg-red-50"
-                    title="हटवा"
+                    title={isEn ? 'Delete' : 'हटवा'}
                   >
                     <Trash2 className="w-4 h-4" />
                   </button>
@@ -171,8 +181,8 @@ export default function UsersManagementPage() {
       <Modal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
-        title="नवीन प्रतिनिधी जोडा (Add New Host)"
-        description="प्रतिनिधीच्या लॉगिनसाठी ईमेल व पासवर्ड सेट करा."
+        title={isEn ? 'Add New Host' : 'नवीन प्रतिनिधी जोडा'}
+        description={isEn ? 'Set up login credentials for the representative.' : 'प्रतिनिधीच्या लॉगिनसाठी ईमेल व पासवर्ड सेट करा.'}
         maxWidth="md"
       >
         <form onSubmit={handleCreateUser} className="space-y-4">
@@ -184,21 +194,21 @@ export default function UsersManagementPage() {
 
           <div className="space-y-1">
             <label className="block text-xs font-bold text-stone-700 font-devanagari">
-              प्रतिनिधीचे पूर्ण नाव *
+              {isEn ? 'Full Name *' : 'प्रतिनिधीचे पूर्ण नाव *'}
             </label>
             <input
               type="text"
               required
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="उदा. राहुल कदम"
+              placeholder={isEn ? 'e.g. Rahul Kadam' : 'उदा. राहुल कदम'}
               className="w-full px-3.5 py-2 border border-stone-300 rounded-lg text-xs font-devanagari"
             />
           </div>
 
           <div className="space-y-1">
             <label className="block text-xs font-bold text-stone-700 font-devanagari">
-              ईमेल आयडी (Email) *
+              {isEn ? 'Email Address *' : 'ईमेल आयडी *'}
             </label>
             <input
               type="email"
@@ -212,7 +222,7 @@ export default function UsersManagementPage() {
 
           <div className="space-y-1">
             <label className="block text-xs font-bold text-stone-700 font-devanagari">
-              पासवर्ड (Password) *
+              {isEn ? 'Password (Min 6 chars) *' : 'पासवर्ड (किमान ६ अक्षरे) *'}
             </label>
             <input
               type="password"
@@ -220,7 +230,7 @@ export default function UsersManagementPage() {
               minLength={6}
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              placeholder="किमान ६ अक्षरे"
+              placeholder="••••••••"
               className="w-full px-3.5 py-2 border border-stone-300 rounded-lg text-xs"
             />
           </div>
@@ -228,7 +238,7 @@ export default function UsersManagementPage() {
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1">
               <label className="block text-xs font-bold text-stone-700 font-devanagari">
-                मोबाईल क्रमांक
+                {isEn ? 'Mobile Number' : 'मोबाईल क्रमांक'}
               </label>
               <input
                 type="tel"
@@ -241,25 +251,25 @@ export default function UsersManagementPage() {
 
             <div className="space-y-1">
               <label className="block text-xs font-bold text-stone-700 font-devanagari">
-                भूमिका (Role)
+                {isEn ? 'Role' : 'भूमिका'}
               </label>
               <select
                 value={role}
                 onChange={(e) => setRole(e.target.value as UserRole)}
                 className="w-full px-3 py-2 border border-stone-300 rounded-lg text-xs font-devanagari"
               >
-                <option value="HOST">मंडळ प्रतिनिधी (Host)</option>
-                <option value="SUPER_ADMIN">सुपर ॲडमिन (Super Admin)</option>
+                <option value="HOST">{isEn ? 'Mandal Host' : 'मंडळ प्रतिनिधी'}</option>
+                <option value="SUPER_ADMIN">{isEn ? 'Super Admin' : 'सुपर ॲडमिन'}</option>
               </select>
             </div>
           </div>
 
           <div className="pt-3 flex items-center justify-end gap-2 border-t border-stone-100">
             <Button type="button" variant="outline" size="sm" onClick={() => setIsModalOpen(false)}>
-              रद्द करा
+              {t('common.cancel')}
             </Button>
             <Button type="submit" variant="primary" size="sm" isLoading={isSubmitting} className="font-devanagari">
-              खाते तयार करा
+              {isEn ? 'Create Account' : 'खाते तयार करा'}
             </Button>
           </div>
         </form>

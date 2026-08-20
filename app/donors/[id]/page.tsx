@@ -22,6 +22,7 @@ import { Button } from '@/components/ui/Button';
 import { Modal } from '@/components/ui/Modal';
 import { Badge } from '@/components/ui/Badge';
 import { useAppMode } from '@/lib/context/mode-context';
+import { useLanguage } from '@/lib/context/language-context';
 import { Donor, Payment, Pavti, MandalSettings } from '@/types';
 import { formatIndianCurrency } from '@/lib/utils/number-to-words';
 import { PavtiCard } from '@/components/pavti/PavtiCard';
@@ -35,6 +36,8 @@ export default function DonorDetailPage({
   const { id } = use(params);
   const router = useRouter();
   const { mode } = useAppMode();
+  const { language, t } = useLanguage();
+  const isEn = language === 'en';
 
   const [donor, setDonor] = useState<Donor | null>(null);
   const [payments, setPayments] = useState<Payment[]>([]);
@@ -86,12 +89,12 @@ export default function DonorDetailPage({
       });
 
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'देणगीदार हटवण्यात त्रुटी आली.');
+      if (!res.ok) throw new Error(data.error || (isEn ? 'Failed to delete donor.' : 'देणगीदार हटवण्यात त्रुटी आली.'));
 
       alert(data.message);
       router.push('/donors');
     } catch (err: any) {
-      setDeleteError(err.message || 'त्रुटी आली.');
+      setDeleteError(err.message || (isEn ? 'Error occurred.' : 'त्रुटी आली.'));
     } finally {
       setIsDeleting(false);
     }
@@ -100,7 +103,7 @@ export default function DonorDetailPage({
   if (isLoading) {
     return (
       <div className="text-center py-20 font-devanagari text-stone-600">
-        माहिती लोड होत आहे...
+        {t('common.loading')}
       </div>
     );
   }
@@ -108,9 +111,11 @@ export default function DonorDetailPage({
   if (!donor) {
     return (
       <div className="text-center py-20 space-y-4">
-        <div className="text-red-500 font-bold font-devanagari">देणगीदार सापडला नाही.</div>
+        <div className="text-red-500 font-bold font-devanagari">
+          {isEn ? 'Donor not found.' : 'देणगीदार सापडला नाही.'}
+        </div>
         <Link href="/donors">
-          <Button variant="outline">यादीवर परत जा</Button>
+          <Button variant="outline">{isEn ? 'Back to Donors List' : 'यादीवर परत जा'}</Button>
         </Link>
       </div>
     );
@@ -135,11 +140,11 @@ export default function DonorDetailPage({
                 {donor.name}
               </h1>
               {donor.isArchived && (
-                <Badge variant="warning">निष्क्रिय (Archived)</Badge>
+                <Badge variant="warning">{isEn ? 'Archived' : 'निष्क्रिय'}</Badge>
               )}
             </div>
             <p className="text-xs text-stone-500 font-mono">
-              {donor.mobile || 'मोबाईल नोंद नाही'} • नोंदणी दिनांक: {donor.createdAt.split('T')[0]}
+              {donor.mobile || (isEn ? 'No mobile' : 'मोबाईल नोंद नाही')} • {isEn ? 'Registered:' : 'नोंदणी दिनांक:'} {donor.createdAt.split('T')[0]}
             </p>
           </div>
         </div>
@@ -148,7 +153,7 @@ export default function DonorDetailPage({
           <Link href="/pavti/new">
             <Button variant="primary" size="sm" className="font-devanagari flex items-center gap-1.5 shadow">
               <PlusCircle className="w-4 h-4" />
-              <span>या देणगीदारासाठी पावती फाडा</span>
+              <span>{isEn ? 'Issue Receipt for Donor' : 'या देणगीदारासाठी पावती तयार करा'}</span>
             </Button>
           </Link>
 
@@ -159,7 +164,7 @@ export default function DonorDetailPage({
             className="font-devanagari flex items-center gap-1.5"
           >
             <Trash2 className="w-4 h-4" />
-            <span>हटवा (Delete)</span>
+            <span>{isEn ? 'Delete' : 'हटवा'}</span>
           </Button>
         </div>
       </div>
@@ -169,7 +174,7 @@ export default function DonorDetailPage({
         <Card className="border-amber-200">
           <CardContent className="p-5 space-y-1">
             <span className="text-xs font-bold text-stone-500 font-devanagari uppercase">
-              एकूण जमा वर्गणी
+              {isEn ? 'Total Contributed' : 'एकूण जमा वर्गणी'}
             </span>
             <div className="text-2xl font-black text-orange-800 font-mono">
               {formatIndianCurrency(donor.totalContributed)}
@@ -180,10 +185,10 @@ export default function DonorDetailPage({
         <Card className="border-amber-200">
           <CardContent className="p-5 space-y-1">
             <span className="text-xs font-bold text-stone-500 font-devanagari uppercase">
-              एकूण पावत्या संख्या
+              {isEn ? 'Total Receipts' : 'एकूण पावत्या संख्या'}
             </span>
             <div className="text-2xl font-black text-stone-900 font-mono">
-              {donor.pavtiCount} पावत्या
+              {donor.pavtiCount} {isEn ? 'Receipts' : 'पावत्या'}
             </div>
           </CardContent>
         </Card>
@@ -191,10 +196,10 @@ export default function DonorDetailPage({
         <Card className="border-amber-200">
           <CardContent className="p-5 space-y-1">
             <span className="text-xs font-bold text-stone-500 font-devanagari uppercase">
-              पत्ता / संपर्क
+              {isEn ? 'Address / Contact' : 'पत्ता / संपर्क'}
             </span>
             <div className="text-sm font-semibold text-stone-800 font-devanagari truncate">
-              {donor.address || 'पत्ता नोंद नाही'}
+              {donor.address || (isEn ? 'No address registered' : 'पत्ता नोंद नाही')}
             </div>
           </CardContent>
         </Card>
@@ -204,13 +209,13 @@ export default function DonorDetailPage({
       <div className="space-y-4">
         <h2 className="text-lg font-bold font-devanagari text-stone-900 flex items-center gap-2">
           <FileCheck className="w-5 h-5 text-orange-600" />
-          <span>पावत्यांचा इतिहास (Pavti Records)</span>
+          <span>{isEn ? 'Receipt History' : 'पावत्यांचा इतिहास'}</span>
         </h2>
 
         {pavtis.length === 0 ? (
           <Card className="border-stone-200">
             <CardContent className="p-8 text-center text-stone-400 font-devanagari">
-              या देणगीदारासाठी अद्याप कोणतीही पावती फाडली गेलेली नाही.
+              {isEn ? 'No receipts generated yet for this donor.' : 'या देणगीदारासाठी अद्याप कोणतीही पावती तयार केलेली नाही.'}
             </CardContent>
           </Card>
         ) : (
@@ -224,20 +229,20 @@ export default function DonorDetailPage({
                   <div className="space-y-1">
                     <div className="flex items-center gap-2">
                       <span className="font-mono font-bold text-sm text-orange-800">
-                        {pavti.receiptNumber ? `#${pavti.receiptNumber}` : 'बाकी (DUE)'}
+                        {pavti.receiptNumber ? `#${pavti.receiptNumber}` : (isEn ? 'DUE' : 'बाकी')}
                       </span>
                       <span className="text-xs text-stone-400 font-mono">
                         📅 {pavti.date}
                       </span>
                       <Badge variant={pavti.paymentMethod === 'UPI' ? 'info' : 'gold'}>
-                        {pavti.paymentMethod === 'UPI' ? 'UPI' : 'रोख (Cash)'}
+                        {pavti.paymentMethod === 'UPI' ? 'UPI' : (isEn ? 'Cash' : 'रोख')}
                       </Badge>
                       {pavti.status === 'DUE' && (
-                        <Badge variant="warning">बाकी (DUE)</Badge>
+                        <Badge variant="warning">{isEn ? 'DUE' : 'बाकी'}</Badge>
                       )}
                     </div>
                     <div className="text-xs text-stone-600 font-devanagari">
-                      प्रतिनिधी: {pavti.hostName}
+                      {isEn ? 'Host:' : 'प्रतिनिधी:'} {pavti.hostName}
                     </div>
                   </div>
 
@@ -266,7 +271,7 @@ export default function DonorDetailPage({
                         className="flex items-center gap-1 font-devanagari"
                       >
                         <Share2 className="w-3.5 h-3.5" />
-                        <span>शेअर</span>
+                        <span>{isEn ? 'Share' : 'शेअर'}</span>
                       </Button>
                     </div>
                   </div>
@@ -284,10 +289,10 @@ export default function DonorDetailPage({
         title={
           <div className="flex items-center gap-2 text-red-600 font-devanagari">
             <AlertTriangle className="w-5 h-5" />
-            <span>देणगीदार हटवण्याची पुष्टी करा</span>
+            <span>{isEn ? 'Confirm Delete Donor' : 'देणगीदार हटवण्याची पुष्टी करा'}</span>
           </div>
         }
-        description="तुम्हाला खरोखर हा देणगीदार सदस्य हटवायचा आहे का?"
+        description={isEn ? 'Are you sure you want to delete this donor member?' : 'तुम्हाला खरोखर हा देणगीदार सदस्य हटवायचा आहे का?'}
         maxWidth="md"
       >
         <div className="space-y-4 pt-1">
@@ -298,21 +303,23 @@ export default function DonorDetailPage({
           )}
 
           <div className="p-3.5 bg-stone-100 rounded-xl text-xs text-stone-800 font-devanagari space-y-1.5 border border-stone-200">
-            <div><strong>नाव:</strong> {donor.name}</div>
-            <div><strong>मोबाईल:</strong> {donor.mobile || '-'}</div>
-            <div><strong>एकूण जमा:</strong> {formatIndianCurrency(donor.totalContributed)} ({donor.pavtiCount} पावत्या)</div>
+            <div><strong>{isEn ? 'Name:' : 'नाव:'}</strong> {donor.name}</div>
+            <div><strong>{isEn ? 'Mobile:' : 'मोबाईल:'}</strong> {donor.mobile || '-'}</div>
+            <div><strong>{isEn ? 'Total Contributed:' : 'एकूण जमा:'}</strong> {formatIndianCurrency(donor.totalContributed)} ({donor.pavtiCount} {isEn ? 'receipts' : 'पावत्या'})</div>
           </div>
 
           {hasHistory ? (
             <div className="p-3 bg-amber-50 border border-amber-300 rounded-xl text-xs text-amber-900 font-devanagari space-y-1">
-              <div className="font-bold">🛡️ आर्थिक इतिहास संरक्षण:</div>
+              <div className="font-bold">{isEn ? '🛡️ Financial Ledger Protection:' : '🛡️ आर्थिक इतिहास संरक्षण:'}</div>
               <div className="text-[11px] text-amber-800">
-                या देणगीदाराच्या नावावर आर्थिक पावत्या असल्याने जमा हिशोबाचा ताळेबंद सुरक्षित ठेवण्यासाठी हे रेकॉर्ड निष्क्रिय (Archive) केले जाईल. मूळ जमा रकमेचा हिशोब अबाधित राहील.
+                {isEn
+                  ? 'Because this donor has active financial records, this donor will be archived to preserve ledger balance.'
+                  : 'या देणगीदाराच्या नावावर आर्थिक पावत्या असल्याने जमा हिशोबाचा ताळेबंद सुरक्षित ठेवण्यासाठी हे रेकॉर्ड निष्क्रिय केले जाईल.'}
               </div>
             </div>
           ) : (
             <div className="p-3 bg-stone-50 border border-stone-200 rounded-xl text-xs text-stone-600 font-devanagari">
-              या देणगीदाराचा कोणताही आर्थिक इतिहास नाही. हे रेकॉर्ड कायमस्वरूपी हटवले जाईल.
+              {isEn ? 'No financial history. This donor record will be permanently deleted.' : 'या देणगीदाराचा कोणताही आर्थिक इतिहास नाही. हे रेकॉर्ड कायमस्वरूपी हटवले जाईल.'}
             </div>
           )}
 
@@ -323,7 +330,7 @@ export default function DonorDetailPage({
               size="sm"
               onClick={() => setIsDeleteModalOpen(false)}
             >
-              रद्द करा (Cancel)
+              {t('common.cancel')}
             </Button>
             <Button
               type="button"
@@ -333,7 +340,7 @@ export default function DonorDetailPage({
               onClick={handleDeleteMember}
               className="font-devanagari font-bold"
             >
-              {hasHistory ? 'होय, निष्क्रिय (Archive) करा' : 'होय, कायमचे हटवा'}
+              {hasHistory ? (isEn ? 'Archive Donor' : 'होय, निष्क्रिय करा') : (isEn ? 'Delete Permanently' : 'होय, कायमचे हटवा')}
             </Button>
           </div>
         </div>

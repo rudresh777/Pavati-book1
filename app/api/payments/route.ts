@@ -81,7 +81,7 @@ export async function POST(request: Request) {
     const storage = getStorageProvider();
     await storage.init();
 
-    // 1. Ensure or create Donor record
+    // 1. Ensure or link Donor record (prevents duplicate donors)
     let finalDonorId = donorId;
     if (!finalDonorId) {
       // Check if donor with same mobile exists
@@ -89,6 +89,17 @@ export async function POST(request: Request) {
         const existing = await storage.getDonorByMobile(donorMobile.trim(), mode as AppMode);
         if (existing) {
           finalDonorId = existing.id;
+        }
+      }
+
+      // If still not matched, check by exact name
+      if (!finalDonorId && donorName?.trim()) {
+        const donors = await storage.getDonors(mode as AppMode);
+        const matchName = donors.find(
+          (d) => d.name.trim().toLowerCase() === donorName.trim().toLowerCase() && !d.isArchived
+        );
+        if (matchName) {
+          finalDonorId = matchName.id;
         }
       }
 
@@ -165,11 +176,14 @@ export async function POST(request: Request) {
     }
 
     // 3. Handle DUE (or PENDING) payment
-    // IMPORTANT: Due payments do NOT consume an official receipt number or add to collection
+    // IMPORTANT: Every DUE receipt receives a sequential receipt number, but is NOT added to paid collection.
+    const { formatted: formattedDueReceiptNumber, numeric: nextDueNumber } =
+      await storage.getNextReceiptNumber(mode as AppMode);
+
     const duePayment: Payment = {
       id: paymentId,
-      receiptNumber: undefined,
-      numericReceiptNumber: undefined,
+      receiptNumber: formattedDueReceiptNumber,
+      numericReceiptNumber: nextDueNumber,
       donorId: finalDonorId,
       donorName: donorName.trim(),
       donorMobile: donorMobile?.trim() || '',
@@ -178,7 +192,7 @@ export async function POST(request: Request) {
       receivedAmount: 0,
       remainingAmount: numExpected,
       status: 'DUE',
-      paymentMethod: paymentMethod as PaymentMethod,
+      paymentMethod: 'DUE',
       transactionReference: transactionReference?.trim() || '',
       date: today,
       hostId: session.userId,
@@ -200,7 +214,7 @@ export async function POST(request: Request) {
       action: 'DUE_PAVTI_CREATED',
       entityType: 'PAYMENT',
       entityId: duePayment.id,
-      details: `Generated Due Pavti (बाकी) for ${donorName} (₹${numExpected}).`,
+      details: `Generated Due Pavti (बाकी) #${formattedDueReceiptNumber} for ${donorName} (₹${numExpected}).`,
       mode: mode as AppMode,
     });
 
