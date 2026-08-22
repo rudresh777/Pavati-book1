@@ -1,5 +1,3 @@
-import * as dotenv from 'dotenv';
-dotenv.config({ path: '.env.local' });
 import bcrypt from 'bcryptjs';
 import { LocalStorageProvider } from '../lib/storage/local-provider';
 import { User } from '../types';

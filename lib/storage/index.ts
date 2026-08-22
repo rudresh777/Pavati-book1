@@ -19,7 +19,7 @@ export function getStorageProvider(): IStorageProvider {
     storageInstance = new LocalStorageProvider();
   }
 
-  return storageInstance;
+  return storageInstance!;
 }
 
 export * from './types';

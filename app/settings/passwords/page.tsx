@@ -503,7 +503,7 @@ export default function PasswordManagementPage() {
                 </div>
                 <span>{isEn ? 'Change Super Admin Password' : 'सुपर ॲडमिन पासवर्ड बदला'}</span>
               </div>
-              <Badge variant="primary">
+              <Badge variant="gold">
                 {superAdminUsers.length} {isEn ? 'Super Admin Accounts' : 'सुपर ॲडमिन खाती'}
               </Badge>
             </div>
@@ -576,7 +576,7 @@ export default function PasswordManagementPage() {
                     </div>
                     <div className="flex justify-between text-stone-600">
                       <span>{isEn ? 'Role:' : 'भूमिका:'}</span>
-                      <Badge variant="primary">{isEn ? 'Super Admin' : 'सुपर ॲडमिन'}</Badge>
+                      <Badge variant="gold">{isEn ? 'Super Admin' : 'सुपर ॲडमिन'}</Badge>
                     </div>
                   </div>
                 )}
@@ -684,7 +684,7 @@ export default function PasswordManagementPage() {
               </div>
               <div className="flex justify-between border-t border-amber-200/70 pt-1">
                 <span className="text-stone-500">{isEn ? 'Role:' : 'भूमिका:'}</span>
-                <Badge variant={confirmModalData.targetUser.role === 'SUPER_ADMIN' ? 'primary' : 'warning'}>
+                <Badge variant={confirmModalData.targetUser.role === 'SUPER_ADMIN' ? 'gold' : 'warning'}>
                   {confirmModalData.targetUser.role === 'SUPER_ADMIN'
                     ? isEn
                       ? 'Super Admin'

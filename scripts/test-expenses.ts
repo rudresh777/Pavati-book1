@@ -1,5 +1,3 @@
-import * as dotenv from 'dotenv';
-dotenv.config({ path: '.env.local' });
 import { LocalStorageProvider } from '../lib/storage/local-provider';
 import { Expense } from '../types';
 

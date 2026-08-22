@@ -7,6 +7,9 @@ import {
   Pavti,
   Announcement,
   AuditLog,
+  Expense,
+  ExpenseSummary,
+  DailyExpenseRecord,
   AppMode,
   CollectionSummary,
 } from '@/types';
@@ -80,6 +83,14 @@ export class GoogleStorageProvider implements IStorageProvider {
     return this.fallbackProvider.saveUser(user);
   }
 
+  async updateUserPassword(
+    userId: string,
+    newPassword: string,
+    performedBy: { userId: string; userName: string; userRole: UserRole }
+  ): Promise<boolean> {
+    return this.fallbackProvider.updateUserPassword(userId, newPassword, performedBy);
+  }
+
   async deleteUser(id: string): Promise<boolean> {
     return this.fallbackProvider.deleteUser(id);
   }
@@ -122,10 +133,6 @@ export class GoogleStorageProvider implements IStorageProvider {
     return this.fallbackProvider.getPendingPayments(mode);
   }
 
-  async getNextReceiptNumber(mode: AppMode): Promise<{ formatted: string; numeric: number }> {
-    return this.fallbackProvider.getNextReceiptNumber(mode);
-  }
-
   async savePayment(payment: Payment, mode: AppMode): Promise<Payment> {
     return this.fallbackProvider.savePayment(payment, mode);
   }
@@ -155,6 +162,10 @@ export class GoogleStorageProvider implements IStorageProvider {
     user?: { userId: string; userName: string; userRole: UserRole }
   ): Promise<{ success: boolean; deletedPayment: Payment }> {
     return this.fallbackProvider.deletePayment(id, mode, user);
+  }
+
+  async getNextReceiptNumber(mode: AppMode): Promise<{ formatted: string; numeric: number }> {
+    return this.fallbackProvider.getNextReceiptNumber(mode);
   }
 
   async markPaymentAsPaid(
@@ -192,6 +203,47 @@ export class GoogleStorageProvider implements IStorageProvider {
 
   async savePavti(pavti: Pavti, mode: AppMode): Promise<Pavti> {
     return this.fallbackProvider.savePavti(pavti, mode);
+  }
+
+  // --- Expenses ---
+  async getExpenses(mode: AppMode, filterDate?: string): Promise<Expense[]> {
+    return this.fallbackProvider.getExpenses(mode, filterDate);
+  }
+
+  async getExpenseById(id: string, mode: AppMode): Promise<Expense | null> {
+    return this.fallbackProvider.getExpenseById(id, mode);
+  }
+
+  async saveExpense(expense: Expense, mode: AppMode): Promise<Expense> {
+    return this.fallbackProvider.saveExpense(expense, mode);
+  }
+
+  async updateExpense(
+    id: string,
+    data: {
+      date?: string;
+      spentFor?: string;
+      description?: string;
+      amount?: number;
+      vendorPerson?: string;
+      note?: string;
+    },
+    mode: AppMode,
+    user?: { userId: string; userName: string; userRole: UserRole }
+  ): Promise<Expense> {
+    return this.fallbackProvider.updateExpense(id, data, mode, user);
+  }
+
+  async deleteExpense(
+    id: string,
+    mode: AppMode,
+    user?: { userId: string; userName: string; userRole: UserRole }
+  ): Promise<{ success: boolean; deletedExpense: Expense }> {
+    return this.fallbackProvider.deleteExpense(id, mode, user);
+  }
+
+  async getExpenseSummary(mode: AppMode, targetDate?: string): Promise<ExpenseSummary> {
+    return this.fallbackProvider.getExpenseSummary(mode, targetDate);
   }
 
   // --- Announcements ---
