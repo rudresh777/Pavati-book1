@@ -50,8 +50,16 @@ export function ModeProvider({
           return data.user;
         }
       }
+      // If unauthorized or no user returned, clear client session state
+      setUserState(null);
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem('mandal_auth_user');
+      }
     } catch {
-      // ignore
+      setUserState(null);
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem('mandal_auth_user');
+      }
     }
     return null;
   };

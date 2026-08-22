@@ -22,8 +22,7 @@ export async function getSession(): Promise<AuthSession | null> {
   } catch {
     // ignore error in edge cases
   }
-  // Default session when login is bypassed
-  return DEFAULT_SUPER_ADMIN_SESSION;
+  return null;
 }
 
 export async function createSession(user: AuthSession): Promise<string> {
@@ -48,11 +47,17 @@ export async function clearSession(): Promise<void> {
 
 export async function requireAuth(): Promise<AuthSession> {
   const session = await getSession();
-  return session || DEFAULT_SUPER_ADMIN_SESSION;
+  if (!session) {
+    throw new Error('Unauthorized');
+  }
+  return session;
 }
 
 export async function requireSuperAdmin(): Promise<AuthSession> {
   const session = await getSession();
-  return session || DEFAULT_SUPER_ADMIN_SESSION;
+  if (!session || session.role !== 'SUPER_ADMIN') {
+    throw new Error('Forbidden: Super Admin access required');
+  }
+  return session;
 }
 
