@@ -265,7 +265,38 @@ async function runMigration() {
     else console.log(`  ✅ Migrated ${annPayload.length} announcements.`);
   }
 
-  // 7. Migrate Audit Logs
+  // 7. Migrate Expenses (Live + Test)
+  const allExpenses = [
+    ...(db.liveData?.expenses || []).map((e: any) => ({ ...e, mode: 'LIVE' })),
+    ...(db.testData?.expenses || []).map((e: any) => ({ ...e, mode: 'TEST' })),
+  ];
+
+  if (allExpenses.length > 0) {
+    console.log(`\n💰 Migrating ${allExpenses.length} Expenses...`);
+    const expPayload = allExpenses.map((e: any) => ({
+      id: e.id,
+      expense_number: e.expenseNumber || null,
+      numeric_expense_number: e.numericExpenseNumber || null,
+      date: e.date,
+      spent_for: e.spentFor,
+      description: e.description || '',
+      amount: Number(e.amount || 0),
+      vendor_person: e.vendorPerson || '',
+      note: e.note || '',
+      added_by: e.addedBy || 'Admin',
+      added_by_id: e.addedById || null,
+      user_role: e.userRole || 'HOST',
+      mode: e.mode,
+      created_at: e.createdAt || new Date().toISOString(),
+      updated_at: e.updatedAt || new Date().toISOString(),
+    }));
+
+    const { error } = await supabase.from('expenses').upsert(expPayload, { onConflict: 'id' });
+    if (error) console.error('  ⚠️  Expenses error:', error.message);
+    else console.log(`  ✅ Migrated ${expPayload.length} expenses.`);
+  }
+
+  // 8. Migrate Audit Logs
   const allLogs = [
     ...(db.liveData?.auditLogs || []).map((l: any) => ({ ...l, mode: 'LIVE' })),
     ...(db.testData?.auditLogs || []).map((l: any) => ({ ...l, mode: 'TEST' })),

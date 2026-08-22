@@ -26,6 +26,8 @@ export async function GET(request: Request) {
   }
 }
 
+import { translateToMarathi } from '@/lib/utils/translate';
+
 export async function POST(request: Request) {
   try {
     const session = await getSession();
@@ -36,8 +38,10 @@ export async function POST(request: Request) {
     const body = await request.json();
     const {
       id,
+      title,
       titleMarathi,
       titleEnglish,
+      content,
       contentMarathi,
       contentEnglish,
       date,
@@ -48,12 +52,20 @@ export async function POST(request: Request) {
       venue,
     } = body;
 
-    if (!titleMarathi || !contentMarathi) {
+    const rawTitle = (titleMarathi || title || titleEnglish || '').trim();
+    const rawContent = (contentMarathi || content || contentEnglish || '').trim();
+
+    if (!rawTitle || !rawContent) {
       return NextResponse.json(
-        { error: 'शीर्षक आणि मजकूर आवश्यक आहे.' },
+        { error: 'शीर्षक आणि मजकूर आवश्यक आहे (Title and content are required).' },
         { status: 400 }
       );
     }
+
+    // Auto-translate to Marathi if needed (Marathi-only requirement for public display)
+    const finalTitleMarathi = await translateToMarathi(titleMarathi || rawTitle);
+    const finalContentMarathi = await translateToMarathi(contentMarathi || rawContent);
+    const finalVenueMarathi = venue ? await translateToMarathi(venue.trim()) : undefined;
 
     const storage = getStorageProvider();
     await storage.init();
@@ -62,17 +74,19 @@ export async function POST(request: Request) {
 
     const announcement: Announcement = {
       id: id || `ann-${Date.now()}`,
-      titleMarathi: titleMarathi.trim(),
-      titleEnglish: titleEnglish?.trim() || '',
-      contentMarathi: contentMarathi.trim(),
-      contentEnglish: contentEnglish?.trim() || '',
+      titleMarathi: finalTitleMarathi || rawTitle,
+      titleEnglish: titleEnglish?.trim() || (title !== finalTitleMarathi ? title?.trim() : undefined) || '',
+      titleOriginal: rawTitle,
+      contentMarathi: finalContentMarathi || rawContent,
+      contentEnglish: contentEnglish?.trim() || (content !== finalContentMarathi ? content?.trim() : undefined) || '',
+      contentOriginal: rawContent,
       date: date || new Date().toISOString().split('T')[0],
       time: time?.trim() || undefined,
       active: isPublished,
       status: status as any,
       priority,
       eventDate: eventDate || undefined,
-      venue: venue?.trim() || undefined,
+      venue: finalVenueMarathi || venue?.trim() || undefined,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };

@@ -12,7 +12,9 @@ import { cn } from '@/lib/utils/cn';
 function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const redirectUrl = searchParams.get('redirect') || '/dashboard';
+  const rawRedirect = searchParams.get('redirect');
+  // Default landing page should always be /dashboard
+  const redirectUrl = rawRedirect && !rawRedirect.includes('/login') ? rawRedirect : '/dashboard';
   const { language, setLanguage, t } = useLanguage();
   const { setUser } = useAppMode();
 

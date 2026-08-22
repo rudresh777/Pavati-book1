@@ -98,7 +98,7 @@ export function HomeContent({ settings, latestAnnouncement }: HomeContentProps) 
       </section>
 
       {/* =======================================================
-          2. LATEST PUBLISHED ANNOUNCEMENT BANNER
+          2. LATEST PUBLISHED ANNOUNCEMENT BANNER (ALWAYS MARATHI)
           ======================================================= */}
       {latestAnnouncement && (
         <section className="bg-amber-50 border-2 border-amber-300 rounded-2xl p-5 sm:p-6 shadow-sm">
@@ -109,26 +109,22 @@ export function HomeContent({ settings, latestAnnouncement }: HomeContentProps) 
             <div className="space-y-1.5 flex-1">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <span className="text-xs font-bold text-orange-800 uppercase tracking-wider bg-orange-100 px-2.5 py-0.5 rounded-full font-devanagari">
-                  {t('hero.latestAnnouncement')}
+                  महत्त्वाची सूचना
                 </span>
                 <span className="text-xs text-stone-500 font-medium font-mono">
-                  {t('hero.date')} {latestAnnouncement.date}
+                  दिनांक: {latestAnnouncement.date}
                 </span>
               </div>
               <h3 className="text-lg font-bold text-stone-900 font-devanagari">
-                {language === 'en' && latestAnnouncement.titleEnglish
-                  ? latestAnnouncement.titleEnglish
-                  : latestAnnouncement.titleMarathi}
+                {latestAnnouncement.titleMarathi || latestAnnouncement.titleOriginal || latestAnnouncement.titleEnglish}
               </h3>
               <p className="text-xs sm:text-sm text-stone-700 font-devanagari leading-relaxed">
-                {language === 'en' && latestAnnouncement.contentEnglish
-                  ? latestAnnouncement.contentEnglish
-                  : latestAnnouncement.contentMarathi}
+                {latestAnnouncement.contentMarathi || latestAnnouncement.contentOriginal || latestAnnouncement.contentEnglish}
               </p>
               {latestAnnouncement.venue && (
                 <div className="text-xs text-amber-900 font-semibold pt-1 flex items-center gap-1.5 font-devanagari">
                   <MapPin className="w-3.5 h-3.5 text-orange-600" />
-                  <span>{t('hero.venue')} {latestAnnouncement.venue}</span>
+                  <span>स्थान: {latestAnnouncement.venue}</span>
                 </div>
               )}
             </div>
@@ -210,20 +206,23 @@ export function HomeContent({ settings, latestAnnouncement }: HomeContentProps) 
             </div>
           </div>
 
-          <div className="flex items-start gap-3">
-            <div className="p-2.5 bg-amber-50 text-amber-800 rounded-lg flex-shrink-0">
-              <Phone className="w-5 h-5 text-orange-600" />
+          {(settings?.contactNumber || settings?.alternateContact) && (
+            <div className="flex items-start gap-3">
+              <div className="p-2.5 bg-amber-50 text-amber-800 rounded-lg flex-shrink-0">
+                <Phone className="w-5 h-5 text-orange-600" />
+              </div>
+              <div>
+                <span className="text-xs font-bold text-stone-500 uppercase tracking-wider block font-devanagari">
+                  {t('hero.contactLabel')}
+                </span>
+                <p className="text-sm font-semibold text-stone-900 font-mono mt-0.5">
+                  {settings.contactNumber && <span>+91 {settings.contactNumber}</span>}
+                  {settings.contactNumber && settings.alternateContact && <span> / </span>}
+                  {settings.alternateContact && <span>+91 {settings.alternateContact}</span>}
+                </p>
+              </div>
             </div>
-            <div>
-              <span className="text-xs font-bold text-stone-500 uppercase tracking-wider block font-devanagari">
-                {t('hero.contactLabel')}
-              </span>
-              <p className="text-sm font-semibold text-stone-900 font-mono mt-0.5">
-                +91 {settings?.contactNumber || '9876543210'}
-                {settings?.alternateContact && <span> / +91 {settings.alternateContact}</span>}
-              </p>
-            </div>
-          </div>
+          )}
 
           <div className="flex items-start gap-3">
             <div className="p-2.5 bg-amber-50 text-amber-800 rounded-lg flex-shrink-0">

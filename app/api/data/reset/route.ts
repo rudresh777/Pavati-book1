@@ -19,10 +19,11 @@ export async function POST(request: Request) {
 
     const body = await request.json();
     const { confirmation, mode = 'LIVE' } = body;
+    const cleanConfirmation = (confirmation || '').trim().toUpperCase();
 
-    if (confirmation !== 'RESET' && confirmation !== 'DELETE ALL DATA') {
+    if (cleanConfirmation !== 'RESET' && cleanConfirmation !== 'DELETE ALL DATA') {
       return NextResponse.json(
-        { error: 'कृपया अचूक शब्द टाईप करा: DELETE ALL DATA' },
+        { error: 'कृपया अचूक शब्द टाईप करा: RESET' },
         { status: 400 }
       );
     }
@@ -30,7 +31,7 @@ export async function POST(request: Request) {
     const storage = getStorageProvider();
     await storage.init();
 
-    await storage.resetAllData(confirmation, mode as AppMode, {
+    await storage.resetAllData(cleanConfirmation, mode as AppMode, {
       userId: session.userId,
       userName: session.name,
       userRole: session.role,

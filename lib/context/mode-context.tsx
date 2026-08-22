@@ -10,6 +10,7 @@ interface ModeContextType {
   user: AuthSession | null;
   setUser: (user: AuthSession | null) => void;
   isLoading: boolean;
+  refreshUser: () => Promise<AuthSession | null>;
 }
 
 const ModeContext = createContext<ModeContextType | undefined>(undefined);
@@ -22,16 +23,63 @@ export function ModeProvider({
   initialUser?: AuthSession | null;
 }) {
   const [mode, setModeState] = useState<AppMode>('LIVE');
-  const [user, setUser] = useState<AuthSession | null>(initialUser);
+  const [user, setUserState] = useState<AuthSession | null>(initialUser);
   const [isLoading, setIsLoading] = useState(true);
 
+  const setUser = (newUser: AuthSession | null) => {
+    setUserState(newUser);
+    if (typeof window !== 'undefined') {
+      if (newUser) {
+        localStorage.setItem('mandal_auth_user', JSON.stringify(newUser));
+      } else {
+        localStorage.removeItem('mandal_auth_user');
+      }
+    }
+  };
+
+  const refreshUser = async (): Promise<AuthSession | null> => {
+    try {
+      const res = await fetch('/api/auth/me');
+      if (res.ok) {
+        const data = await res.json();
+        if (data.user) {
+          setUserState(data.user);
+          if (typeof window !== 'undefined') {
+            localStorage.setItem('mandal_auth_user', JSON.stringify(data.user));
+          }
+          return data.user;
+        }
+      }
+    } catch {
+      // ignore
+    }
+    return null;
+  };
+
   useEffect(() => {
-    // Load persisted mode preference from localStorage
+    // 1. Load persisted mode preference from localStorage
     const savedMode = localStorage.getItem('mandal_app_mode') as AppMode | null;
     if (savedMode === 'TEST' || savedMode === 'LIVE') {
       setModeState(savedMode);
     }
-    setIsLoading(false);
+
+    // 2. Load cached user for instant synchronous render
+    const savedUserStr = localStorage.getItem('mandal_auth_user');
+    if (savedUserStr) {
+      try {
+        const parsed = JSON.parse(savedUserStr);
+        if (parsed?.userId && parsed?.role) {
+          setUserState(parsed);
+        }
+      } catch {
+        localStorage.removeItem('mandal_auth_user');
+      }
+    }
+
+    // 3. Verify and sync with active backend session cookie
+    refreshUser().finally(() => {
+      setIsLoading(false);
+    });
   }, []);
 
   const setMode = (newMode: AppMode) => {
@@ -53,6 +101,7 @@ export function ModeProvider({
         user,
         setUser,
         isLoading,
+        refreshUser,
       }}
     >
       {children}

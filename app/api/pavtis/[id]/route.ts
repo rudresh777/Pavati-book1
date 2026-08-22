@@ -20,14 +20,23 @@ export async function GET(
     const storage = getStorageProvider();
     await storage.init();
 
-    // Check by pavti ID or receiptNumber
+    // Check by pavti ID, receiptNumber, or paymentId
     let pavti = await storage.getPavtiById(id, mode);
     if (!pavti) {
       pavti = await storage.getPavtiByReceiptNumber(id, mode);
     }
+    if (!pavti && id.startsWith('#')) {
+      pavti = await storage.getPavtiByReceiptNumber(id.slice(1), mode);
+    }
+    if (!pavti) {
+      pavti = await storage.getPavtiByPaymentId(id, mode);
+    }
+    if (!pavti && id.startsWith('pay-')) {
+      pavti = await storage.getPavtiById(`pavti-${id.replace('pay-', '')}`, mode);
+    }
 
     if (!pavti) {
-      return NextResponse.json({ error: 'Pavti not found' }, { status: 404 });
+      return NextResponse.json({ error: 'पावती सापडली नाही.' }, { status: 404 });
     }
 
     const settings = await storage.getSettings();

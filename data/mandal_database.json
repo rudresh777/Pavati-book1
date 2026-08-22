@@ -253,6 +253,7 @@
         "generatedAt": "2026-08-18T17:34:09.070Z"
       }
     ],
+    "expenses": [],
     "auditLogs": [
       {
         "id": "audit-reset-1787041642241",
@@ -420,6 +421,30 @@
         "mode": "LIVE",
         "id": "audit-1787246080646-8sq8",
         "timestamp": "2026-08-20T17:14:40.646Z"
+      },
+      {
+        "id": "audit-1787425334230-xzcw",
+        "userId": "user-host-1",
+        "userName": "मंडळ प्रतिनिधी (Field Host)",
+        "userRole": "HOST",
+        "action": "EXPENSE_ADDED",
+        "entityType": "EXPENSE",
+        "entityId": "exp-1787425333271-vi0uj",
+        "details": "खर्च नोंद: EXP-001 (ढोल / बँड - ₹95000) दिनांक 2026-09-13 नोंदवण्यात आला.",
+        "mode": "LIVE",
+        "timestamp": "2026-08-22T19:02:14.230Z"
+      },
+      {
+        "id": "audit-1787425697661-cfaq",
+        "userId": "user-host-1",
+        "userName": "मंडळ प्रतिनिधी (Field Host)",
+        "userRole": "HOST",
+        "action": "EXPENSE_DELETED",
+        "entityType": "EXPENSE",
+        "entityId": "exp-1787425333271-vi0uj",
+        "details": "खर्च हटवला: EXP-001 (ढोल / बँड - ₹95000) दिनांक 2026-09-13.",
+        "mode": "LIVE",
+        "timestamp": "2026-08-22T19:08:17.661Z"
       }
     ],
     "lastReceiptNumber": 5
@@ -429,7 +454,48 @@
     "donors": [],
     "payments": [],
     "pavtis": [],
-    "auditLogs": []
+    "expenses": [
+      {
+        "id": "exp-test-1787423720706-1",
+        "date": "2026-08-22",
+        "spentFor": "मंडप सजावट",
+        "description": "मंडप व स्टेज साहित्य",
+        "amount": 2500,
+        "vendorPerson": "सचिन डेकोरेटर्स",
+        "note": "ऍडव्हान्स रक्कम",
+        "addedBy": "Super Admin",
+        "mode": "TEST",
+        "createdAt": "2026-08-22T18:35:20.706Z",
+        "updatedAt": "2026-08-22T18:35:20.708Z",
+        "numericExpenseNumber": 1,
+        "expenseNumber": "EXP-001"
+      }
+    ],
+    "auditLogs": [
+      {
+        "id": "audit-clear-1787423720659",
+        "userId": "user-admin-1",
+        "userName": "Super Admin",
+        "userRole": "SUPER_ADMIN",
+        "action": "CLEAR_TEST_DATA",
+        "entityType": "SYSTEM",
+        "details": "Cleared all test data (3 payments, 0 donors, 3 pavtis, 0 expenses). Live data untouched.",
+        "mode": "TEST",
+        "timestamp": "2026-08-22T18:35:20.659Z"
+      },
+      {
+        "id": "audit-1787423720708-721o",
+        "userId": "user-admin",
+        "userName": "Super Admin",
+        "userRole": "HOST",
+        "action": "EXPENSE_ADDED",
+        "entityType": "EXPENSE",
+        "entityId": "exp-test-1787423720706-1",
+        "details": "खर्च नोंद: EXP-001 (मंडप सजावट - ₹2500) दिनांक 2026-08-22 नोंदवण्यात आला.",
+        "mode": "TEST",
+        "timestamp": "2026-08-22T18:35:20.708Z"
+      }
+    ]
   },
   "settings": {
     "mandalNameMarathi": "मोरया गणेशोत्सव मंडळ",
@@ -442,12 +508,12 @@
     "locationMarathi": "अकोला, महाराष्ट्र",
     "contactNumber": "",
     "alternateContact": "",
-    "whatsappGroupLink": "https://chat.whatsapp.com/GaneshMandalTest2026",
+    "whatsappGroupLink": "https://chat.whatsapp.com/EOO3qPs2WJXF3vcvHtmCaL",
     "defaultWhatsAppMessage": "॥ श्री गणेशाय नमः ॥\n\nसस्नेह नमस्कार {donor_name} जी,\n\n{mandal_name} तर्फे सन {year} च्या गणेशोत्सवासाठी आपली ₹{amount}/- ची देणगी / वर्गणी अधिकृतपणे जमा झाली आहे.\n\nपावती क्र: {receipt_no}\nदिनांक: {date}\n\nआपली डिजिटल पावती सोबत जोडली आहे. बाप्पाच्या कृपेने आपल्या सर्व मनोकामना पूर्ण होवोत हीच प्रार्थना!\n\n॥ गणपती बाप्पा मोरया ॥",
     "receiptPrefix": "",
     "startingReceiptNumber": 1,
     "designations": [],
-    "updatedAt": "2026-08-18T09:17:18.281Z"
+    "updatedAt": "2026-08-22T19:50:23.248Z"
   },
   "users": [
     {

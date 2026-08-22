@@ -9,8 +9,13 @@ import {
   Pavti,
   Announcement,
   AuditLog,
+  Expense,
+  ExpenseSummary,
+  DailyExpenseRecord,
   AppMode,
   CollectionSummary,
+  DailyCollectionRecord,
+  PaymentInstallment,
   UserRole,
 } from '@/types';
 import { IStorageProvider, DatabaseBackup } from './types';
@@ -23,16 +28,20 @@ interface DatabaseSchema {
   announcements: Announcement[];
   liveData: {
     receiptCounter: number;
+    expenseCounter?: number;
     donors: Donor[];
     payments: Payment[];
     pavtis: Pavti[];
+    expenses?: Expense[];
     auditLogs: AuditLog[];
   };
   testData: {
     receiptCounter: number;
+    expenseCounter?: number;
     donors: Donor[];
     payments: Payment[];
     pavtis: Pavti[];
+    expenses?: Expense[];
     auditLogs: AuditLog[];
   };
 }
@@ -46,9 +55,9 @@ const DEFAULT_SETTINGS: MandalSettings = {
   locationEnglish: 'Akola, Maharashtra',
   addressMarathi: 'तापडिया नगर अकोला 444001',
   addressEnglish: 'Tapadia Nagar Akola 444001',
-  contactNumber: '9876543210',
-  alternateContact: '9123456789',
-  whatsappGroupLink: 'https://chat.whatsapp.com/sample-ganesh-mandal-group',
+  contactNumber: '',
+  alternateContact: '',
+  whatsappGroupLink: 'https://chat.whatsapp.com/EOO3qPs2WJXF3vcvHtmCaL',
   year: '२०२६',
   taglineMarathi: '॥ श्री गणेशाय नमः ॥',
   sloganMarathi: '॥ गणपती बाप्पा मोरया ॥',
@@ -186,14 +195,29 @@ export class LocalStorageProvider implements IStorageProvider {
   private async readDb(): Promise<DatabaseSchema> {
     await this.init();
     const raw = await fs.readFile(this.filePath, 'utf-8');
-    return JSON.parse(raw) as DatabaseSchema;
+    const db = JSON.parse(raw) as DatabaseSchema;
+    if (db.liveData) {
+      db.liveData.expenses = db.liveData.expenses || [];
+    }
+    if (db.testData) {
+      db.testData.expenses = db.testData.expenses || [];
+    }
+    return db;
   }
 
   private async writeDb(data: DatabaseSchema): Promise<void> {
     await this.init();
-    const tempPath = `${this.filePath}.tmp.${Date.now()}`;
-    await fs.writeFile(tempPath, JSON.stringify(data, null, 2), 'utf-8');
-    await fs.rename(tempPath, this.filePath);
+    try {
+      await fs.writeFile(this.filePath, JSON.stringify(data, null, 2), 'utf-8');
+    } catch (err: any) {
+      if (err.code === 'EPERM' || err.code === 'EBUSY') {
+        // Retry once after brief delay for Windows/OneDrive file locks
+        await new Promise((resolve) => setTimeout(resolve, 50));
+        await fs.writeFile(this.filePath, JSON.stringify(data, null, 2), 'utf-8');
+      } else {
+        throw err;
+      }
+    }
   }
 
   // --- Settings ---
@@ -245,6 +269,50 @@ export class LocalStorageProvider implements IStorageProvider {
 
     await this.writeDb(db);
     return updatedUser;
+  }
+
+  async updateUserPassword(
+    userId: string,
+    newPassword: string,
+    performedBy: { userId: string; userName: string; userRole: UserRole }
+  ): Promise<boolean> {
+    if (performedBy.userRole !== 'SUPER_ADMIN') {
+      throw new Error('अनधिकृत: फक्त सुपर ॲडमिन पासवर्ड बदलू शकतात (Only Super Admin can change passwords).');
+    }
+
+    if (!newPassword || newPassword.length < 6) {
+      throw new Error('पासवर्ड किमान ६ अक्षरांचा असावा (Password must be at least 6 characters).');
+    }
+
+    const db = await this.readDb();
+    const userIndex = db.users.findIndex((u) => u.id === userId);
+    if (userIndex < 0) {
+      throw new Error('वापरकर्ता सापडला नाही (User not found).');
+    }
+
+    const targetUser = db.users[userIndex];
+    const passwordHash = await bcrypt.hash(newPassword, 10);
+
+    db.users[userIndex] = {
+      ...targetUser,
+      passwordHash,
+      updatedAt: new Date().toISOString(),
+    };
+
+    await this.writeDb(db);
+
+    await this.addAuditLog({
+      userId: performedBy.userId,
+      userName: performedBy.userName,
+      userRole: performedBy.userRole,
+      action: 'PASSWORD_CHANGED',
+      entityType: 'USER',
+      entityId: targetUser.id,
+      details: `Super Admin (${performedBy.userName}) changed password for ${targetUser.role} account "${targetUser.name}" (${targetUser.email}).`,
+      mode: 'LIVE',
+    });
+
+    return true;
   }
 
   async deleteUser(id: string): Promise<boolean> {
@@ -415,8 +483,27 @@ export class LocalStorageProvider implements IStorageProvider {
 
     const isDue = payment.status === 'DUE' || payment.status === 'PENDING';
 
+    const receivedAmt = payment.receivedAmount || 0;
+    let installments = payment.installments;
+    if (!installments && receivedAmt > 0 && (payment.status === 'PAID' || payment.status === 'PARTIALLY_PAID')) {
+      const pDate = payment.date ? (payment.date.includes('T') ? payment.date.split('T')[0] : payment.date) : new Date().toISOString().split('T')[0];
+      installments = [
+        {
+          id: `inst-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+          amount: receivedAmt,
+          paymentMethod: payment.paymentMethod === 'UPI' ? 'UPI' : 'CASH',
+          transactionReference: payment.transactionReference,
+          date: pDate,
+          hostId: payment.hostId,
+          hostName: payment.hostName,
+          createdAt: payment.createdAt || new Date().toISOString(),
+        },
+      ];
+    }
+
     const updatedPayment: Payment = {
       ...payment,
+      installments,
       mode,
       updatedAt: new Date().toISOString(),
     };
@@ -670,6 +757,40 @@ export class LocalStorageProvider implements IStorageProvider {
     }
 
     // Update payment record
+    const effectivePaymentDate = paymentDetails.paymentDate || new Date().toISOString().split('T')[0];
+    const prevReceived = payment.receivedAmount || 0;
+    const increment = paymentDetails.receivedAmount > prevReceived && prevReceived > 0
+      ? (paymentDetails.receivedAmount - prevReceived)
+      : paymentDetails.receivedAmount;
+
+    const newInstallment: PaymentInstallment = {
+      id: `inst-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+      amount: increment,
+      paymentMethod: paymentDetails.paymentMethod,
+      transactionReference: paymentDetails.transactionReference,
+      date: effectivePaymentDate,
+      hostId: paymentDetails.hostId,
+      hostName: paymentDetails.hostName,
+      createdAt: new Date().toISOString(),
+    };
+
+    if (!payment.installments) {
+      payment.installments = [];
+      if (prevReceived > 0) {
+        payment.installments.push({
+          id: `inst-${Date.now() - 1000}`,
+          amount: prevReceived,
+          paymentMethod: payment.paymentMethod === 'UPI' ? 'UPI' : 'CASH',
+          transactionReference: payment.transactionReference,
+          date: payment.date ? (payment.date.includes('T') ? payment.date.split('T')[0] : payment.date) : effectivePaymentDate,
+          hostId: payment.hostId,
+          hostName: payment.hostName,
+          createdAt: payment.createdAt || new Date().toISOString(),
+        });
+      }
+    }
+    payment.installments.push(newInstallment);
+
     payment.status = 'PAID';
     payment.receiptNumber = formattedReceiptNumber;
     payment.numericReceiptNumber = nextNumber;
@@ -684,7 +805,7 @@ export class LocalStorageProvider implements IStorageProvider {
         ? `${payment.notes} | ${paymentDetails.notes}`
         : paymentDetails.notes;
     }
-    payment.date = paymentDetails.paymentDate || new Date().toISOString().split('T')[0];
+    payment.date = effectivePaymentDate;
     payment.updatedAt = new Date().toISOString();
 
     // Update or Generate Pavti Record with SAME receipt number
@@ -800,6 +921,255 @@ export class LocalStorageProvider implements IStorageProvider {
     return pavti;
   }
 
+  // --- Expenses (निधी व खर्च व्यवस्थापन) ---
+  async getExpenses(mode: AppMode, filterDate?: string): Promise<Expense[]> {
+    const db = await this.readDb();
+    const scope = mode === 'LIVE' ? db.liveData : db.testData;
+    let list = scope.expenses || [];
+    if (filterDate) {
+      const cleanFilter = filterDate.includes('T') ? filterDate.split('T')[0] : filterDate;
+      list = list.filter((e) => e.date === cleanFilter);
+    }
+    return list.sort((a, b) => {
+      const dateDiff = b.date.localeCompare(a.date);
+      if (dateDiff !== 0) return dateDiff;
+      return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+    });
+  }
+
+  async getExpenseById(id: string, mode: AppMode): Promise<Expense | null> {
+    const db = await this.readDb();
+    const scope = mode === 'LIVE' ? db.liveData : db.testData;
+    return (scope.expenses || []).find((e) => e.id === id) || null;
+  }
+
+  async saveExpense(expense: Expense, mode: AppMode): Promise<Expense> {
+    const db = await this.readDb();
+    const scope = mode === 'LIVE' ? db.liveData : db.testData;
+    if (!scope.expenses) scope.expenses = [];
+
+    // Ensure sequential numeric numbering if missing
+    if (!expense.numericExpenseNumber) {
+      const maxNum = scope.expenses.reduce(
+        (max, e) => Math.max(max, e.numericExpenseNumber || 0),
+        0
+      );
+      expense.numericExpenseNumber = maxNum + 1;
+      expense.expenseNumber = `EXP-${String(expense.numericExpenseNumber).padStart(3, '0')}`;
+    } else if (!expense.expenseNumber) {
+      expense.expenseNumber = `EXP-${String(expense.numericExpenseNumber).padStart(3, '0')}`;
+    }
+
+    const index = scope.expenses.findIndex((e) => e.id === expense.id);
+    const updated: Expense = {
+      ...expense,
+      mode,
+      updatedAt: new Date().toISOString(),
+      createdAt: expense.createdAt || new Date().toISOString(),
+    };
+
+    if (index >= 0) {
+      scope.expenses[index] = updated;
+    } else {
+      scope.expenses.push(updated);
+    }
+
+    if (!scope.auditLogs) scope.auditLogs = [];
+    scope.auditLogs.push({
+      id: `audit-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+      userId: expense.addedById || 'user-admin',
+      userName: expense.addedBy || 'Admin',
+      userRole: expense.userRole || 'HOST',
+      action: index >= 0 ? 'EXPENSE_UPDATED' : 'EXPENSE_ADDED',
+      entityType: 'EXPENSE',
+      entityId: updated.id,
+      details: `खर्च नोंद: ${updated.expenseNumber} (${updated.spentFor} - ₹${updated.amount}) दिनांक ${updated.date} नोंदवण्यात आला.`,
+      mode,
+      timestamp: new Date().toISOString(),
+    });
+
+    await this.writeDb(db);
+    return updated;
+  }
+
+  async updateExpense(
+    id: string,
+    data: {
+      date?: string;
+      spentFor?: string;
+      description?: string;
+      amount?: number;
+      vendorPerson?: string;
+      note?: string;
+    },
+    mode: AppMode,
+    user?: { userId: string; userName: string; userRole: UserRole }
+  ): Promise<Expense> {
+    const db = await this.readDb();
+    const scope = mode === 'LIVE' ? db.liveData : db.testData;
+    if (!scope.expenses) scope.expenses = [];
+    const index = scope.expenses.findIndex((e) => e.id === id);
+    if (index < 0) {
+      throw new Error('खर्च नोंद सापडली नाही.');
+    }
+
+    const existing = scope.expenses[index];
+    const updated: Expense = {
+      ...existing,
+      date: data.date ?? existing.date,
+      spentFor: data.spentFor ?? existing.spentFor,
+      description: data.description !== undefined ? data.description : existing.description,
+      amount: data.amount !== undefined ? Number(data.amount) : existing.amount,
+      vendorPerson: data.vendorPerson !== undefined ? data.vendorPerson : existing.vendorPerson,
+      note: data.note !== undefined ? data.note : existing.note,
+      updatedAt: new Date().toISOString(),
+    };
+
+    scope.expenses[index] = updated;
+
+    if (!scope.auditLogs) scope.auditLogs = [];
+    scope.auditLogs.push({
+      id: `audit-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+      userId: user?.userId || 'user-admin',
+      userName: user?.userName || 'Admin',
+      userRole: user?.userRole || 'HOST',
+      action: 'EXPENSE_UPDATED',
+      entityType: 'EXPENSE',
+      entityId: updated.id,
+      details: `खर्च बदल: ${updated.expenseNumber} (${updated.spentFor} - ₹${updated.amount}) दिनांक ${updated.date}.`,
+      mode,
+      timestamp: new Date().toISOString(),
+    });
+
+    await this.writeDb(db);
+    return updated;
+  }
+
+  async deleteExpense(
+    id: string,
+    mode: AppMode,
+    user?: { userId: string; userName: string; userRole: UserRole }
+  ): Promise<{ success: boolean; deletedExpense: Expense }> {
+    const db = await this.readDb();
+    const scope = mode === 'LIVE' ? db.liveData : db.testData;
+    if (!scope.expenses) scope.expenses = [];
+    const index = scope.expenses.findIndex((e) => e.id === id);
+    if (index < 0) {
+      throw new Error('खर्च नोंद सापडली नाही.');
+    }
+
+    const deletedExpense = scope.expenses[index];
+    scope.expenses.splice(index, 1);
+
+    if (!scope.auditLogs) scope.auditLogs = [];
+    scope.auditLogs.push({
+      id: `audit-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+      userId: user?.userId || 'user-admin',
+      userName: user?.userName || 'Admin',
+      userRole: user?.userRole || 'HOST',
+      action: 'EXPENSE_DELETED',
+      entityType: 'EXPENSE',
+      entityId: id,
+      details: `खर्च हटवला: ${deletedExpense.expenseNumber || id} (${deletedExpense.spentFor} - ₹${deletedExpense.amount}) दिनांक ${deletedExpense.date}.`,
+      mode,
+      timestamp: new Date().toISOString(),
+    });
+
+    await this.writeDb(db);
+    return { success: true, deletedExpense };
+  }
+
+  async getExpenseSummary(mode: AppMode, targetDate?: string): Promise<ExpenseSummary> {
+    const db = await this.readDb();
+    const scope = mode === 'LIVE' ? db.liveData : db.testData;
+    const expenses = scope.expenses || [];
+
+    const formatYYYYMMDD = (d: Date) => {
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      return `${y}-${m}-${day}`;
+    };
+
+    const formatDDMMYYYY = (dateStr: string) => {
+      const clean = dateStr.includes('T') ? dateStr.split('T')[0] : dateStr;
+      if (/^\d{4}-\d{2}-\d{2}$/.test(clean)) {
+        const [y, m, d] = clean.split('-');
+        return `${d}/${m}/${y}`;
+      }
+      return clean;
+    };
+
+    const normalizeDateStr = (dateStr?: string): string => {
+      if (!dateStr) return formatYYYYMMDD(new Date());
+      const clean = dateStr.includes('T') ? dateStr.split('T')[0] : dateStr;
+      if (/^\d{2}\/\d{2}\/\d{4}$/.test(clean)) {
+        const [d, m, y] = clean.split('/');
+        return `${y}-${m}-${d}`;
+      }
+      return clean;
+    };
+
+    const now = new Date();
+    const todayStr = targetDate ? normalizeDateStr(targetDate) : formatYYYYMMDD(now);
+    const baseDate = targetDate ? new Date(`${todayStr}T12:00:00.000Z`) : now;
+
+    const yesterday = new Date(baseDate);
+    yesterday.setDate(baseDate.getDate() - 1);
+    const yesterdayStr = formatYYYYMMDD(yesterday);
+
+    const monthAgo = new Date(now);
+    monthAgo.setDate(now.getDate() - 30);
+
+    let totalExpense = 0;
+    let todayExpense = 0;
+    let yesterdayExpense = 0;
+    let thisMonthExpense = 0;
+
+    const dailyMap: Record<string, DailyExpenseRecord> = {};
+
+    for (const exp of expenses) {
+      const normDate = normalizeDateStr(exp.date);
+      const amt = Number(exp.amount) || 0;
+      totalExpense += amt;
+
+      if (!dailyMap[normDate]) {
+        dailyMap[normDate] = {
+          date: normDate,
+          formattedDate: formatDDMMYYYY(normDate),
+          totalExpense: 0,
+          expenseCount: 0,
+        };
+      }
+      dailyMap[normDate].totalExpense += amt;
+      dailyMap[normDate].expenseCount++;
+
+      if (normDate === todayStr) {
+        todayExpense += amt;
+      }
+      if (normDate === yesterdayStr) {
+        yesterdayExpense += amt;
+      }
+      const expDateObj = new Date(normDate);
+      if (!isNaN(expDateObj.getTime()) && expDateObj >= monthAgo) {
+        thisMonthExpense += amt;
+      }
+    }
+
+    const dailyHistory = Object.values(dailyMap).sort((a, b) =>
+      b.date.localeCompare(a.date)
+    );
+
+    return {
+      todayExpense,
+      totalExpense,
+      yesterdayExpense,
+      thisMonthExpense,
+      mode,
+      dailyHistory,
+    };
+  }
+
   // --- Announcements ---
   async getAnnouncements(onlyActive = false): Promise<Announcement[]> {
     const db = await this.readDb();
@@ -887,16 +1257,43 @@ export class LocalStorageProvider implements IStorageProvider {
   }
 
   // --- Analytics ---
-  async getCollectionSummary(mode: AppMode): Promise<CollectionSummary> {
+  async getCollectionSummary(mode: AppMode, targetDate?: string): Promise<CollectionSummary> {
     const db = await this.readDb();
     const scope = mode === 'LIVE' ? db.liveData : db.testData;
 
+    const formatYYYYMMDD = (d: Date) => {
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      return `${y}-${m}-${day}`;
+    };
+
+    const formatDDMMYYYY = (dateStr: string) => {
+      const clean = dateStr.includes('T') ? dateStr.split('T')[0] : dateStr;
+      if (/^\d{4}-\d{2}-\d{2}$/.test(clean)) {
+        const [y, m, d] = clean.split('-');
+        return `${d}/${m}/${y}`;
+      }
+      return clean;
+    };
+
+    const normalizeDateStr = (dateStr?: string): string => {
+      if (!dateStr) return formatYYYYMMDD(new Date());
+      const clean = dateStr.includes('T') ? dateStr.split('T')[0] : dateStr;
+      if (/^\d{2}\/\d{2}\/\d{4}$/.test(clean)) {
+        const [d, m, y] = clean.split('/');
+        return `${y}-${m}-${d}`;
+      }
+      return clean;
+    };
+
     const now = new Date();
-    const todayStr = now.toISOString().split('T')[0];
+    const todayStr = targetDate ? normalizeDateStr(targetDate) : formatYYYYMMDD(now);
+    const baseDate = targetDate ? new Date(`${todayStr}T12:00:00.000Z`) : now;
     
-    const yesterday = new Date(now);
-    yesterday.setDate(now.getDate() - 1);
-    const yesterdayStr = yesterday.toISOString().split('T')[0];
+    const yesterday = new Date(baseDate);
+    yesterday.setDate(baseDate.getDate() - 1);
+    const yesterdayStr = formatYYYYMMDD(yesterday);
 
     const weekAgo = new Date(now);
     weekAgo.setDate(now.getDate() - 7);
@@ -907,36 +1304,99 @@ export class LocalStorageProvider implements IStorageProvider {
     const currentYear = now.getFullYear();
 
     let totalCollection = 0;
-    let todayCollection = 0;
-    let yesterdayCollection = 0;
-    let thisWeekCollection = 0;
-    let thisMonthCollection = 0;
-    let currentYearCollection = 0;
     let paidPavtisCount = 0;
     let cashCollection = 0;
     let upiCollection = 0;
     let otherCollection = 0;
 
+    // Daily Collection Map: Group actual collections by date
+    const dailyMap: Record<
+      string,
+      {
+        date: string;
+        formattedDate: string;
+        cashCollection: number;
+        upiCollection: number;
+        totalCollection: number;
+        receiptCount: number;
+      }
+    > = {};
+
+    const addCollectionToMap = (
+      pDate: string,
+      amt: number,
+      method: 'CASH' | 'UPI' | 'DUE' | string
+    ) => {
+      if (amt <= 0) return;
+      const normalizedDate = normalizeDateStr(pDate);
+
+      if (!dailyMap[normalizedDate]) {
+        dailyMap[normalizedDate] = {
+          date: normalizedDate,
+          formattedDate: formatDDMMYYYY(normalizedDate),
+          cashCollection: 0,
+          upiCollection: 0,
+          totalCollection: 0,
+          receiptCount: 0,
+        };
+      }
+
+      if (method === 'CASH') {
+        dailyMap[normalizedDate].cashCollection += amt;
+        cashCollection += amt;
+      } else if (method === 'UPI') {
+        dailyMap[normalizedDate].upiCollection += amt;
+        upiCollection += amt;
+      } else {
+        dailyMap[normalizedDate].cashCollection += amt;
+        otherCollection += amt;
+      }
+
+      dailyMap[normalizedDate].totalCollection += amt;
+      dailyMap[normalizedDate].receiptCount++;
+      totalCollection += amt;
+      paidPavtisCount++;
+    };
+
     for (const payment of scope.payments) {
-      if (payment.status === 'PAID') {
-        const amt = payment.receivedAmount || 0;
-        totalCollection += amt;
-        paidPavtisCount++;
+      if (payment.installments && payment.installments.length > 0) {
+        for (const inst of payment.installments) {
+          addCollectionToMap(inst.date, inst.amount, inst.paymentMethod);
+        }
+      } else if (
+        (payment.status === 'PAID' || payment.status === 'PARTIALLY_PAID') &&
+        (payment.receivedAmount || 0) > 0
+      ) {
+        addCollectionToMap(payment.date, payment.receivedAmount, payment.paymentMethod);
+      }
+      // NOTE: DUE / PENDING amounts with receivedAmount === 0 are NEVER added to daily collection!
+    }
 
-        if (payment.paymentMethod === 'CASH') cashCollection += amt;
-        else if (payment.paymentMethod === 'UPI') upiCollection += amt;
-        else otherCollection += amt;
+    // Calculate Today's and Yesterday's collection strictly from dailyMap
+    const todayRecord = dailyMap[todayStr];
+    const todayCollection = todayRecord ? todayRecord.totalCollection : 0;
 
-        const pDate = new Date(payment.date);
-        const pDateStr = payment.date;
+    const yesterdayRecord = dailyMap[yesterdayStr];
+    const yesterdayCollection = yesterdayRecord ? yesterdayRecord.totalCollection : 0;
 
-        if (pDateStr === todayStr) todayCollection += amt;
-        if (pDateStr === yesterdayStr) yesterdayCollection += amt;
-        if (pDate >= weekAgo) thisWeekCollection += amt;
-        if (pDate >= monthAgo) thisMonthCollection += amt;
-        if (pDate.getFullYear() === currentYear) currentYearCollection += amt;
+    // Date range calculations
+    let thisWeekCollection = 0;
+    let thisMonthCollection = 0;
+    let currentYearCollection = 0;
+
+    for (const [dStr, record] of Object.entries(dailyMap)) {
+      const dObj = new Date(dStr);
+      if (!isNaN(dObj.getTime())) {
+        if (dObj >= weekAgo) thisWeekCollection += record.totalCollection;
+        if (dObj >= monthAgo) thisMonthCollection += record.totalCollection;
+        if (dObj.getFullYear() === currentYear) currentYearCollection += record.totalCollection;
       }
     }
+
+    // Sort Daily Collection History: newest date first
+    const dailyHistory = Object.values(dailyMap).sort((a, b) =>
+      b.date.localeCompare(a.date)
+    );
 
     // Pending / Due calculations (CRITICAL: Due amounts are NEVER in totalCollection)
     const pendingPayments = scope.payments.filter(
@@ -965,21 +1425,24 @@ export class LocalStorageProvider implements IStorageProvider {
       upiCollection,
       otherCollection,
       mode,
+      dailyHistory,
     };
   }
 
   // --- Data Reset Operations ---
-  async clearTestData(): Promise<{ deletedPayments: number; deletedDonors: number; deletedPavtis: number }> {
+  async clearTestData(): Promise<{ deletedPayments: number; deletedDonors: number; deletedPavtis: number; deletedExpenses: number }> {
     const db = await this.readDb();
     const deletedPayments = db.testData.payments.length;
     const deletedDonors = db.testData.donors.length;
     const deletedPavtis = db.testData.pavtis.length;
+    const deletedExpenses = db.testData.expenses?.length || 0;
 
     db.testData = {
       receiptCounter: 0,
       donors: [],
       payments: [],
       pavtis: [],
+      expenses: [],
       auditLogs: [
         {
           id: `audit-clear-${Date.now()}`,
@@ -988,7 +1451,7 @@ export class LocalStorageProvider implements IStorageProvider {
           userRole: 'SUPER_ADMIN',
           action: 'CLEAR_TEST_DATA',
           entityType: 'SYSTEM',
-          details: `Cleared all test data (${deletedPayments} payments, ${deletedDonors} donors, ${deletedPavtis} pavtis). Live data untouched.`,
+          details: `Cleared all test data (${deletedPayments} payments, ${deletedDonors} donors, ${deletedPavtis} pavtis, ${deletedExpenses} expenses). Live data untouched.`,
           mode: 'TEST',
           timestamp: new Date().toISOString(),
         },
@@ -996,7 +1459,7 @@ export class LocalStorageProvider implements IStorageProvider {
     };
 
     await this.writeDb(db);
-    return { deletedPayments, deletedDonors, deletedPavtis };
+    return { deletedPayments, deletedDonors, deletedPavtis, deletedExpenses };
   }
 
   async resetAllData(
@@ -1019,6 +1482,7 @@ export class LocalStorageProvider implements IStorageProvider {
         donors: [],
         payments: [],
         pavtis: [],
+        expenses: [],
         auditLogs: [
           {
             id: `audit-reset-${Date.now()}`,
@@ -1039,6 +1503,7 @@ export class LocalStorageProvider implements IStorageProvider {
         donors: [],
         payments: [],
         pavtis: [],
+        expenses: [],
         auditLogs: [],
       };
     }
@@ -1060,12 +1525,14 @@ export class LocalStorageProvider implements IStorageProvider {
         donors: db.liveData.donors,
         payments: db.liveData.payments,
         pavtis: db.liveData.pavtis,
+        expenses: db.liveData.expenses || [],
         auditLogs: db.liveData.auditLogs,
       },
       testData: {
         donors: db.testData.donors,
         payments: db.testData.payments,
         pavtis: db.testData.pavtis,
+        expenses: db.testData.expenses || [],
         auditLogs: db.testData.auditLogs,
       },
     };
@@ -1089,6 +1556,7 @@ export class LocalStorageProvider implements IStorageProvider {
         donors: backupData.liveData.donors || [],
         payments: backupData.liveData.payments || [],
         pavtis: backupData.liveData.pavtis || [],
+        expenses: backupData.liveData.expenses || [],
         auditLogs: [
           ...(backupData.liveData.auditLogs || []),
           {
@@ -1111,6 +1579,7 @@ export class LocalStorageProvider implements IStorageProvider {
         donors: backupData.testData?.donors || [],
         payments: backupData.testData?.payments || [],
         pavtis: backupData.testData?.pavtis || [],
+        expenses: backupData.testData?.expenses || [],
         auditLogs: backupData.testData?.auditLogs || [],
       },
     };

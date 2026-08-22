@@ -6,8 +6,13 @@ import {
   Pavti,
   Announcement,
   AuditLog,
+  Expense,
+  ExpenseSummary,
+  DailyExpenseRecord,
   AppMode,
   CollectionSummary,
+  DailyCollectionRecord,
+  PaymentInstallment,
   UserRole,
 } from '@/types';
 import { IStorageProvider, DatabaseBackup } from './types';
@@ -18,11 +23,13 @@ import { numberToWordsMarathi, numberToWordsEnglish } from '@/lib/utils/number-t
 export class SupabaseStorageProvider implements IStorageProvider {
   name = 'SupabaseStorageProvider';
   private fallbackProvider: LocalStorageProvider;
-  private isConfigured = false;
+
+  get isConfigured(): boolean {
+    return isSupabaseServerConfigured();
+  }
 
   constructor() {
     this.fallbackProvider = new LocalStorageProvider();
-    this.isConfigured = isSupabaseServerConfigured;
   }
 
   async init(): Promise<void> {
@@ -197,6 +204,90 @@ export class SupabaseStorageProvider implements IStorageProvider {
     }
   }
 
+  async updateUserPassword(
+    userId: string,
+    newPassword: string,
+    performedBy: { userId: string; userName: string; userRole: UserRole }
+  ): Promise<boolean> {
+    if (performedBy.userRole !== 'SUPER_ADMIN') {
+      throw new Error('अनधिकृत: फक्त सुपर ॲडमिन पासवर्ड बदलू शकतात (Only Super Admin can change passwords).');
+    }
+
+    if (!newPassword || newPassword.length < 6) {
+      throw new Error('पासवर्ड किमान ६ अक्षरांचा असावा (Password must be at least 6 characters).');
+    }
+
+    const targetUser = await this.getUserById(userId);
+    if (!targetUser) {
+      throw new Error('वापरकर्ता सापडला नाही (User not found).');
+    }
+
+    // Always update fallback local provider
+    try {
+      await this.fallbackProvider.updateUserPassword(userId, newPassword, performedBy);
+    } catch (fbErr) {
+      console.warn('[SupabaseStorageProvider] Fallback password update notice:', fbErr);
+    }
+
+    if (!this.isConfigured) return true;
+
+    try {
+      const client = this.getClient();
+
+      // Update password directly in Supabase Auth using Supabase Admin Auth API
+      const { data: authUsers, error: listErr } = await client.auth.admin.listUsers();
+      if (!listErr && authUsers && authUsers.users) {
+        const authUser = authUsers.users.find(
+          (u) => u.email?.toLowerCase() === targetUser.email.toLowerCase()
+        );
+
+        if (authUser) {
+          const { error: updateAuthErr } = await client.auth.admin.updateUserById(authUser.id, {
+            password: newPassword,
+            user_metadata: {
+              name: targetUser.name,
+              role: targetUser.role,
+            },
+          });
+          if (updateAuthErr) console.warn('[Supabase Auth Admin] updateUserById warning:', updateAuthErr.message);
+        } else {
+          const { error: createAuthErr } = await client.auth.admin.createUser({
+            email: targetUser.email,
+            password: newPassword,
+            email_confirm: true,
+            user_metadata: {
+              name: targetUser.name,
+              role: targetUser.role,
+            },
+          });
+          if (createAuthErr) console.warn('[Supabase Auth Admin] createUser warning:', createAuthErr.message);
+        }
+      }
+
+      // Update timestamp on users table
+      await client
+        .from('users')
+        .update({ updated_at: new Date().toISOString() })
+        .eq('id', userId);
+
+      await this.addAuditLog({
+        userId: performedBy.userId,
+        userName: performedBy.userName,
+        userRole: performedBy.userRole,
+        action: 'PASSWORD_CHANGED',
+        entityType: 'USER',
+        entityId: targetUser.id,
+        details: `Super Admin (${performedBy.userName}) changed password for ${targetUser.role} account "${targetUser.name}" (${targetUser.email}).`,
+        mode: 'LIVE',
+      });
+
+      return true;
+    } catch (err) {
+      console.error('[SupabaseStorageProvider] updateUserPassword error:', err);
+      return true;
+    }
+  }
+
   async deleteUser(id: string): Promise<boolean> {
     if (!this.isConfigured) return this.fallbackProvider.deleteUser(id);
 
@@ -315,7 +406,6 @@ export class SupabaseStorageProvider implements IStorageProvider {
 
     try {
       const client = this.getClient();
-      // Check if donor has financial records
       const [{ count: paymentCount }, { count: pavtiCount }] = await Promise.all([
         client.from('payments').select('id', { count: 'exact', head: true }).eq('donor_id', donorId),
         client.from('pavtis').select('id', { count: 'exact', head: true }).eq('donor_id', donorId),
@@ -453,7 +543,6 @@ export class SupabaseStorageProvider implements IStorageProvider {
 
     try {
       const client = this.getClient();
-      // Use atomic PostgreSQL stored function if available
       const { data, error } = await client.rpc('get_next_receipt_number_atomic', { p_mode: mode });
 
       if (!error && data && data.numeric) {
@@ -463,7 +552,7 @@ export class SupabaseStorageProvider implements IStorageProvider {
         };
       }
 
-      // Fallback calculation directly in Supabase
+      // Fallback calculation
       const settings = await this.getSettings();
       const prefix = settings.receiptPrefix || '';
       const startNum = settings.startingReceiptNumber || 1;
@@ -495,11 +584,39 @@ export class SupabaseStorageProvider implements IStorageProvider {
       const isDue = payment.status === 'DUE' || payment.status === 'PENDING';
       const amountVal = isDue ? payment.expectedAmount : payment.receivedAmount;
 
+      let finalDonorId = payment.donorId || null;
+      if (finalDonorId) {
+        const { data: donorRow } = await client
+          .from('donors')
+          .select('id')
+          .eq('id', finalDonorId)
+          .maybeSingle();
+
+        if (!donorRow) {
+          const newDonor = {
+            id: finalDonorId,
+            name: payment.donorName.trim(),
+            mobile: payment.donorMobile ? payment.donorMobile.replace(/\D/g, '') : '',
+            address: payment.donorAddress?.trim() || '',
+            total_contributed: 0,
+            pavti_count: 0,
+            mode: mode,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          };
+          const { error: insertDonorErr } = await client.from('donors').insert(newDonor);
+          if (insertDonorErr) {
+            console.warn('[SupabaseStorageProvider] Could not insert missing donor, setting donor_id to null:', insertDonorErr);
+            finalDonorId = null;
+          }
+        }
+      }
+
       const payload = {
         id: payment.id,
         receipt_number: payment.receiptNumber || null,
         numeric_receipt_number: payment.numericReceiptNumber || null,
-        donor_id: payment.donorId || null,
+        donor_id: finalDonorId,
         donor_name: payment.donorName.trim(),
         donor_mobile: payment.donorMobile?.trim() || '',
         donor_address: payment.donorAddress?.trim() || '',
@@ -547,9 +664,8 @@ export class SupabaseStorageProvider implements IStorageProvider {
         generated_at: new Date().toISOString(),
       };
 
-      await client.from('pavtis').upsert(pavtiPayload, { onConflict: 'payment_id' });
+      await client.from('pavtis').upsert(pavtiPayload, { onConflict: 'id' });
 
-      // Update Donor summary stats if donorId is linked
       if (payment.donorId) {
         await this.syncDonorStats(payment.donorId, mode);
       }
@@ -608,7 +724,6 @@ export class SupabaseStorageProvider implements IStorageProvider {
 
       if (error) throw error;
 
-      // Update associated Pavti record
       const pavtiUpdates: any = {};
       if (data.donorName !== undefined) pavtiUpdates.donor_name = data.donorName.trim();
       if (data.donorMobile !== undefined) pavtiUpdates.donor_mobile = data.donorMobile.trim();
@@ -624,7 +739,6 @@ export class SupabaseStorageProvider implements IStorageProvider {
         await client.from('pavtis').update(pavtiUpdates).eq('payment_id', paymentId);
       }
 
-      // Update linked donor
       if (existing.donorId) {
         const donorUpdates: any = { updated_at: new Date().toISOString() };
         if (data.donorName) donorUpdates.name = data.donorName.trim();
@@ -691,16 +805,15 @@ export class SupabaseStorageProvider implements IStorageProvider {
       const existing = await this.getPaymentById(id, mode);
       if (!existing) throw new Error('पावती / देणगी नोंद सापडली नाही.');
 
-      // Delete payment (cascades to pavti via foreign key)
+      // Delete pavti first then payment
+      await client.from('pavtis').delete().eq('payment_id', id);
       const { error } = await client.from('payments').delete().eq('id', id).eq('mode', mode);
       if (error) throw error;
 
-      // Sync donor stats
       if (existing.donorId) {
         await this.syncDonorStats(existing.donorId, mode);
       }
 
-      // Add audit log
       await this.addAuditLog({
         userId: user?.userId || 'system',
         userName: user?.userName || 'Admin',
@@ -769,6 +882,7 @@ export class SupabaseStorageProvider implements IStorageProvider {
       if (paymentError) throw paymentError;
 
       const pavtiPayload = {
+        id: `pavti-${paymentId.replace('pay-', '')}`,
         receipt_number: receiptNumber,
         numeric_receipt_number: existing.numericReceiptNumber || null,
         payment_id: paymentId,
@@ -790,18 +904,16 @@ export class SupabaseStorageProvider implements IStorageProvider {
 
       const { data: updatedPavtiRow, error: pavtiError } = await client
         .from('pavtis')
-        .upsert(pavtiPayload, { onConflict: 'payment_id' })
+        .upsert(pavtiPayload, { onConflict: 'id' })
         .select()
         .single();
 
       if (pavtiError) throw pavtiError;
 
-      // Sync donor stats
       if (existing.donorId) {
         await this.syncDonorStats(existing.donorId, mode);
       }
 
-      // Add audit log
       await this.addAuditLog({
         userId: paymentDetails.hostId,
         userName: paymentDetails.hostName,
@@ -943,6 +1055,328 @@ export class SupabaseStorageProvider implements IStorageProvider {
     } catch (err) {
       console.error('[SupabaseStorageProvider] savePavti error:', err);
       return this.fallbackProvider.savePavti(pavti, mode);
+    }
+  }
+
+  // ============================================================================
+  // EXPENSES (निधी व खर्च व्यवस्थापन)
+  // ============================================================================
+  async getExpenses(mode: AppMode, filterDate?: string): Promise<Expense[]> {
+    if (!this.isConfigured) return this.fallbackProvider.getExpenses(mode, filterDate);
+
+    try {
+      const client = this.getClient();
+      let query = client
+        .from('expenses')
+        .select('*')
+        .eq('mode', mode)
+        .order('date', { ascending: false })
+        .order('created_at', { ascending: false });
+
+      if (filterDate) {
+        const cleanFilter = filterDate.includes('T') ? filterDate.split('T')[0] : filterDate;
+        query = query.eq('date', cleanFilter);
+      }
+
+      const { data, error } = await query;
+      if (error) {
+        console.warn('[SupabaseStorageProvider] getExpenses error (falling back):', error.message);
+        return this.fallbackProvider.getExpenses(mode, filterDate);
+      }
+      return (data || []).map(this.mapExpenseFromDb);
+    } catch (err) {
+      console.warn('[SupabaseStorageProvider] getExpenses fallback error:', err);
+      return this.fallbackProvider.getExpenses(mode, filterDate);
+    }
+  }
+
+  async getExpenseById(id: string, mode: AppMode): Promise<Expense | null> {
+    if (!this.isConfigured) return this.fallbackProvider.getExpenseById(id, mode);
+
+    try {
+      const client = this.getClient();
+      const { data, error } = await client
+        .from('expenses')
+        .select('*')
+        .eq('id', id)
+        .eq('mode', mode)
+        .maybeSingle();
+
+      if (error) {
+        console.warn('[SupabaseStorageProvider] getExpenseById error (falling back):', error.message);
+        return this.fallbackProvider.getExpenseById(id, mode);
+      }
+      return data ? this.mapExpenseFromDb(data) : null;
+    } catch (err) {
+      console.warn('[SupabaseStorageProvider] getExpenseById fallback error:', err);
+      return this.fallbackProvider.getExpenseById(id, mode);
+    }
+  }
+
+  async saveExpense(expense: Expense, mode: AppMode): Promise<Expense> {
+    if (!this.isConfigured) return this.fallbackProvider.saveExpense(expense, mode);
+
+    try {
+      const client = this.getClient();
+
+      // Check / assign numeric expense number
+      let numericExpenseNumber = expense.numericExpenseNumber;
+      let expenseNumber = expense.expenseNumber;
+
+      if (!numericExpenseNumber) {
+        const { data: maxRows } = await client
+          .from('expenses')
+          .select('numeric_expense_number')
+          .eq('mode', mode)
+          .order('numeric_expense_number', { ascending: false })
+          .limit(1);
+
+        const maxNum = maxRows && maxRows.length > 0 && maxRows[0].numeric_expense_number
+          ? Number(maxRows[0].numeric_expense_number)
+          : 0;
+
+        numericExpenseNumber = maxNum + 1;
+        expenseNumber = `EXP-${String(numericExpenseNumber).padStart(3, '0')}`;
+      } else if (!expenseNumber) {
+        expenseNumber = `EXP-${String(numericExpenseNumber).padStart(3, '0')}`;
+      }
+
+      const payload = {
+        id: expense.id,
+        expense_number: expenseNumber,
+        numeric_expense_number: numericExpenseNumber,
+        date: expense.date,
+        spent_for: expense.spentFor,
+        description: expense.description || '',
+        amount: Number(expense.amount || 0),
+        vendor_person: expense.vendorPerson || '',
+        note: expense.note || '',
+        added_by: expense.addedBy,
+        added_by_id: expense.addedById || null,
+        user_role: expense.userRole || 'HOST',
+        mode: mode,
+        updated_at: new Date().toISOString(),
+      };
+
+      const { data, error } = await client
+        .from('expenses')
+        .upsert(payload, { onConflict: 'id' })
+        .select()
+        .single();
+
+      if (error) {
+        console.warn('[SupabaseStorageProvider] saveExpense error (falling back):', error.message);
+        return this.fallbackProvider.saveExpense(expense, mode);
+      }
+
+      await this.addAuditLog({
+        userId: expense.addedById || 'user-admin',
+        userName: expense.addedBy || 'Admin',
+        userRole: expense.userRole || 'HOST',
+        action: 'EXPENSE_ADDED',
+        entityType: 'EXPENSE',
+        entityId: expense.id,
+        details: `खर्च नोंद: ${expenseNumber} (${expense.spentFor} - ₹${expense.amount}) दिनांक ${expense.date} नोंदवण्यात आला.`,
+        mode,
+      });
+
+      return this.mapExpenseFromDb(data);
+    } catch (err) {
+      console.warn('[SupabaseStorageProvider] saveExpense fallback error:', err);
+      return this.fallbackProvider.saveExpense(expense, mode);
+    }
+  }
+
+  async updateExpense(
+    id: string,
+    data: {
+      date?: string;
+      spentFor?: string;
+      description?: string;
+      amount?: number;
+      vendorPerson?: string;
+      note?: string;
+    },
+    mode: AppMode,
+    user?: { userId: string; userName: string; userRole: UserRole }
+  ): Promise<Expense> {
+    if (!this.isConfigured) return this.fallbackProvider.updateExpense(id, data, mode, user);
+
+    try {
+      const client = this.getClient();
+      const existing = await this.getExpenseById(id, mode);
+      if (!existing) throw new Error('खर्च नोंद सापडली नाही.');
+
+      const payload = {
+        date: data.date ?? existing.date,
+        spent_for: data.spentFor ?? existing.spentFor,
+        description: data.description !== undefined ? data.description : existing.description || '',
+        amount: data.amount !== undefined ? Number(data.amount) : existing.amount,
+        vendor_person: data.vendorPerson !== undefined ? data.vendorPerson : existing.vendorPerson || '',
+        note: data.note !== undefined ? data.note : existing.note || '',
+        updated_at: new Date().toISOString(),
+      };
+
+      const { data: updatedRow, error } = await client
+        .from('expenses')
+        .update(payload)
+        .eq('id', id)
+        .eq('mode', mode)
+        .select()
+        .single();
+
+      if (error) {
+        console.warn('[SupabaseStorageProvider] updateExpense error (falling back):', error.message);
+        return this.fallbackProvider.updateExpense(id, data, mode, user);
+      }
+
+      await this.addAuditLog({
+        userId: user?.userId || 'user-admin',
+        userName: user?.userName || 'Admin',
+        userRole: user?.userRole || 'HOST',
+        action: 'EXPENSE_UPDATED',
+        entityType: 'EXPENSE',
+        entityId: id,
+        details: `खर्च बदल: ${existing.expenseNumber} (${payload.spent_for} - ₹${payload.amount}) दिनांक ${payload.date}.`,
+        mode,
+      });
+
+      return this.mapExpenseFromDb(updatedRow);
+    } catch (err) {
+      console.warn('[SupabaseStorageProvider] updateExpense fallback error:', err);
+      return this.fallbackProvider.updateExpense(id, data, mode, user);
+    }
+  }
+
+  async deleteExpense(
+    id: string,
+    mode: AppMode,
+    user?: { userId: string; userName: string; userRole: UserRole }
+  ): Promise<{ success: boolean; deletedExpense: Expense }> {
+    if (!this.isConfigured) return this.fallbackProvider.deleteExpense(id, mode, user);
+
+    try {
+      const client = this.getClient();
+      const existing = await this.getExpenseById(id, mode);
+      if (!existing) throw new Error('खर्च नोंद सापडली नाही.');
+
+      const { error } = await client.from('expenses').delete().eq('id', id).eq('mode', mode);
+      if (error) {
+        console.warn('[SupabaseStorageProvider] deleteExpense error (falling back):', error.message);
+        return this.fallbackProvider.deleteExpense(id, mode, user);
+      }
+
+      await this.addAuditLog({
+        userId: user?.userId || 'user-admin',
+        userName: user?.userName || 'Admin',
+        userRole: user?.userRole || 'HOST',
+        action: 'EXPENSE_DELETED',
+        entityType: 'EXPENSE',
+        entityId: id,
+        details: `खर्च हटवला: ${existing.expenseNumber || id} (${existing.spentFor} - ₹${existing.amount}) दिनांक ${existing.date}.`,
+        mode,
+      });
+
+      return { success: true, deletedExpense: existing };
+    } catch (err) {
+      console.warn('[SupabaseStorageProvider] deleteExpense fallback error:', err);
+      return this.fallbackProvider.deleteExpense(id, mode, user);
+    }
+  }
+
+  async getExpenseSummary(mode: AppMode, targetDate?: string): Promise<ExpenseSummary> {
+    if (!this.isConfigured) return this.fallbackProvider.getExpenseSummary(mode, targetDate);
+
+    try {
+      const expenses = await this.getExpenses(mode);
+
+      const formatYYYYMMDD = (d: Date) => {
+        const y = d.getFullYear();
+        const m = String(d.getMonth() + 1).padStart(2, '0');
+        const day = String(d.getDate()).padStart(2, '0');
+        return `${y}-${m}-${day}`;
+      };
+
+      const formatDDMMYYYY = (dateStr: string) => {
+        const clean = dateStr.includes('T') ? dateStr.split('T')[0] : dateStr;
+        if (/^\d{4}-\d{2}-\d{2}$/.test(clean)) {
+          const [y, m, d] = clean.split('-');
+          return `${d}/${m}/${y}`;
+        }
+        return clean;
+      };
+
+      const normalizeDateStr = (dateStr?: string): string => {
+        if (!dateStr) return formatYYYYMMDD(new Date());
+        const clean = dateStr.includes('T') ? dateStr.split('T')[0] : dateStr;
+        if (/^\d{2}\/\d{2}\/\d{4}$/.test(clean)) {
+          const [d, m, y] = clean.split('/');
+          return `${y}-${m}-${d}`;
+        }
+        return clean;
+      };
+
+      const now = new Date();
+      const todayStr = targetDate ? normalizeDateStr(targetDate) : formatYYYYMMDD(now);
+      const baseDate = targetDate ? new Date(`${todayStr}T12:00:00.000Z`) : now;
+
+      const yesterday = new Date(baseDate);
+      yesterday.setDate(baseDate.getDate() - 1);
+      const yesterdayStr = formatYYYYMMDD(yesterday);
+
+      const monthAgo = new Date(now);
+      monthAgo.setDate(now.getDate() - 30);
+
+      let totalExpense = 0;
+      let todayExpense = 0;
+      let yesterdayExpense = 0;
+      let thisMonthExpense = 0;
+
+      const dailyMap: Record<string, DailyExpenseRecord> = {};
+
+      for (const exp of expenses) {
+        const normDate = normalizeDateStr(exp.date);
+        const amt = Number(exp.amount) || 0;
+        totalExpense += amt;
+
+        if (!dailyMap[normDate]) {
+          dailyMap[normDate] = {
+            date: normDate,
+            formattedDate: formatDDMMYYYY(normDate),
+            totalExpense: 0,
+            expenseCount: 0,
+          };
+        }
+        dailyMap[normDate].totalExpense += amt;
+        dailyMap[normDate].expenseCount++;
+
+        if (normDate === todayStr) {
+          todayExpense += amt;
+        }
+        if (normDate === yesterdayStr) {
+          yesterdayExpense += amt;
+        }
+        const expDateObj = new Date(normDate);
+        if (!isNaN(expDateObj.getTime()) && expDateObj >= monthAgo) {
+          thisMonthExpense += amt;
+        }
+      }
+
+      const dailyHistory = Object.values(dailyMap).sort((a, b) =>
+        b.date.localeCompare(a.date)
+      );
+
+      return {
+        todayExpense,
+        totalExpense,
+        yesterdayExpense,
+        thisMonthExpense,
+        mode,
+        dailyHistory,
+      };
+    } catch (err) {
+      console.warn('[SupabaseStorageProvider] getExpenseSummary fallback error:', err);
+      return this.fallbackProvider.getExpenseSummary(mode, targetDate);
     }
   }
 
@@ -1092,18 +1526,45 @@ export class SupabaseStorageProvider implements IStorageProvider {
   // ============================================================================
   // ANALYTICS & SUMMARY
   // ============================================================================
-  async getCollectionSummary(mode: AppMode): Promise<CollectionSummary> {
-    if (!this.isConfigured) return this.fallbackProvider.getCollectionSummary(mode);
+  async getCollectionSummary(mode: AppMode, targetDate?: string): Promise<CollectionSummary> {
+    if (!this.isConfigured) return this.fallbackProvider.getCollectionSummary(mode, targetDate);
 
     try {
       const payments = await this.getPayments(mode);
 
-      const now = new Date();
-      const todayStr = now.toISOString().split('T')[0];
+      const formatYYYYMMDD = (d: Date) => {
+        const y = d.getFullYear();
+        const m = String(d.getMonth() + 1).padStart(2, '0');
+        const day = String(d.getDate()).padStart(2, '0');
+        return `${y}-${m}-${day}`;
+      };
 
-      const yesterday = new Date(now);
-      yesterday.setDate(now.getDate() - 1);
-      const yesterdayStr = yesterday.toISOString().split('T')[0];
+      const formatDDMMYYYY = (dateStr: string) => {
+        const clean = dateStr.includes('T') ? dateStr.split('T')[0] : dateStr;
+        if (/^\d{4}-\d{2}-\d{2}$/.test(clean)) {
+          const [y, m, d] = clean.split('-');
+          return `${d}/${m}/${y}`;
+        }
+        return clean;
+      };
+
+      const normalizeDateStr = (dateStr?: string): string => {
+        if (!dateStr) return formatYYYYMMDD(new Date());
+        const clean = dateStr.includes('T') ? dateStr.split('T')[0] : dateStr;
+        if (/^\d{2}\/\d{2}\/\d{4}$/.test(clean)) {
+          const [d, m, y] = clean.split('/');
+          return `${y}-${m}-${d}`;
+        }
+        return clean;
+      };
+
+      const now = new Date();
+      const todayStr = targetDate ? normalizeDateStr(targetDate) : formatYYYYMMDD(now);
+      const baseDate = targetDate ? new Date(`${todayStr}T12:00:00.000Z`) : now;
+
+      const yesterday = new Date(baseDate);
+      yesterday.setDate(baseDate.getDate() - 1);
+      const yesterdayStr = formatYYYYMMDD(yesterday);
 
       const weekAgo = new Date(now);
       weekAgo.setDate(now.getDate() - 7);
@@ -1114,36 +1575,94 @@ export class SupabaseStorageProvider implements IStorageProvider {
       const currentYear = now.getFullYear();
 
       let totalCollection = 0;
-      let todayCollection = 0;
-      let yesterdayCollection = 0;
-      let thisWeekCollection = 0;
-      let thisMonthCollection = 0;
-      let currentYearCollection = 0;
       let paidPavtisCount = 0;
       let cashCollection = 0;
       let upiCollection = 0;
       let otherCollection = 0;
 
+      const dailyMap: Record<
+        string,
+        {
+          date: string;
+          formattedDate: string;
+          cashCollection: number;
+          upiCollection: number;
+          totalCollection: number;
+          receiptCount: number;
+        }
+      > = {};
+
+      const addCollectionToMap = (
+        pDate: string,
+        amt: number,
+        method: 'CASH' | 'UPI' | 'DUE' | string
+      ) => {
+        if (amt <= 0) return;
+        const normalizedDate = normalizeDateStr(pDate);
+
+        if (!dailyMap[normalizedDate]) {
+          dailyMap[normalizedDate] = {
+            date: normalizedDate,
+            formattedDate: formatDDMMYYYY(normalizedDate),
+            cashCollection: 0,
+            upiCollection: 0,
+            totalCollection: 0,
+            receiptCount: 0,
+          };
+        }
+
+        if (method === 'CASH') {
+          dailyMap[normalizedDate].cashCollection += amt;
+          cashCollection += amt;
+        } else if (method === 'UPI') {
+          dailyMap[normalizedDate].upiCollection += amt;
+          upiCollection += amt;
+        } else {
+          dailyMap[normalizedDate].cashCollection += amt;
+          otherCollection += amt;
+        }
+
+        dailyMap[normalizedDate].totalCollection += amt;
+        dailyMap[normalizedDate].receiptCount++;
+        totalCollection += amt;
+        paidPavtisCount++;
+      };
+
       for (const payment of payments) {
-        if (payment.status === 'PAID') {
-          const amt = payment.receivedAmount || 0;
-          totalCollection += amt;
-          paidPavtisCount++;
-
-          if (payment.paymentMethod === 'CASH') cashCollection += amt;
-          else if (payment.paymentMethod === 'UPI') upiCollection += amt;
-          else otherCollection += amt;
-
-          const pDate = new Date(payment.date);
-          const pDateStr = payment.date;
-
-          if (pDateStr === todayStr) todayCollection += amt;
-          if (pDateStr === yesterdayStr) yesterdayCollection += amt;
-          if (pDate >= weekAgo) thisWeekCollection += amt;
-          if (pDate >= monthAgo) thisMonthCollection += amt;
-          if (pDate.getFullYear() === currentYear) currentYearCollection += amt;
+        if (payment.installments && payment.installments.length > 0) {
+          for (const inst of payment.installments) {
+            addCollectionToMap(inst.date, inst.amount, inst.paymentMethod);
+          }
+        } else if (
+          (payment.status === 'PAID' || payment.status === 'PARTIALLY_PAID') &&
+          (payment.receivedAmount || 0) > 0
+        ) {
+          addCollectionToMap(payment.date, payment.receivedAmount, payment.paymentMethod);
         }
       }
+
+      const todayRecord = dailyMap[todayStr];
+      const todayCollection = todayRecord ? todayRecord.totalCollection : 0;
+
+      const yesterdayRecord = dailyMap[yesterdayStr];
+      const yesterdayCollection = yesterdayRecord ? yesterdayRecord.totalCollection : 0;
+
+      let thisWeekCollection = 0;
+      let thisMonthCollection = 0;
+      let currentYearCollection = 0;
+
+      for (const [dStr, record] of Object.entries(dailyMap)) {
+        const dObj = new Date(dStr);
+        if (!isNaN(dObj.getTime())) {
+          if (dObj >= weekAgo) thisWeekCollection += record.totalCollection;
+          if (dObj >= monthAgo) thisMonthCollection += record.totalCollection;
+          if (dObj.getFullYear() === currentYear) currentYearCollection += record.totalCollection;
+        }
+      }
+
+      const dailyHistory = Object.values(dailyMap).sort((a, b) =>
+        b.date.localeCompare(a.date)
+      );
 
       const pendingPayments = payments.filter(
         (p) => p.status === 'DUE' || p.status === 'PENDING' || p.status === 'PARTIALLY_PAID'
@@ -1171,6 +1690,7 @@ export class SupabaseStorageProvider implements IStorageProvider {
         upiCollection,
         otherCollection,
         mode,
+        dailyHistory,
       };
     } catch (err) {
       console.error('[SupabaseStorageProvider] getCollectionSummary error:', err);
@@ -1181,25 +1701,27 @@ export class SupabaseStorageProvider implements IStorageProvider {
   // ============================================================================
   // DATA RESET & BACKUP
   // ============================================================================
-  async clearTestData(): Promise<{ deletedPayments: number; deletedDonors: number; deletedPavtis: number }> {
+  // --- Data Reset Operations ---
+  async clearTestData(): Promise<{ deletedPayments: number; deletedDonors: number; deletedPavtis: number; deletedExpenses: number }> {
     if (!this.isConfigured) return this.fallbackProvider.clearTestData();
 
     try {
       const client = this.getClient();
-      const [{ count: deletedPayments }, { count: deletedDonors }, { count: deletedPavtis }] =
+      const [{ count: deletedPayments }, { count: deletedDonors }, { count: deletedPavtis }, { count: deletedExpenses }] =
         await Promise.all([
           client.from('payments').select('id', { count: 'exact', head: true }).eq('mode', 'TEST'),
           client.from('donors').select('id', { count: 'exact', head: true }).eq('mode', 'TEST'),
           client.from('pavtis').select('id', { count: 'exact', head: true }).eq('mode', 'TEST'),
+          client.from('expenses').select('id', { count: 'exact', head: true }).eq('mode', 'TEST'),
         ]);
 
-      await Promise.all([
-        client.from('pavtis').delete().eq('mode', 'TEST'),
-        client.from('payments').delete().eq('mode', 'TEST'),
-        client.from('donors').delete().eq('mode', 'TEST'),
-        client.from('audit_logs').delete().eq('mode', 'TEST'),
-        client.from('receipt_counters').upsert({ mode: 'TEST', last_number: 0, updated_at: new Date().toISOString() }),
-      ]);
+      // Sequential deletion to respect foreign keys
+      await client.from('pavtis').delete().eq('mode', 'TEST');
+      await client.from('payments').delete().eq('mode', 'TEST');
+      await client.from('donors').delete().eq('mode', 'TEST');
+      await client.from('expenses').delete().eq('mode', 'TEST');
+      await client.from('audit_logs').delete().eq('mode', 'TEST');
+      await client.from('receipt_counters').upsert({ mode: 'TEST', last_number: 0, updated_at: new Date().toISOString() });
 
       await this.addAuditLog({
         userId: 'user-admin-1',
@@ -1207,7 +1729,7 @@ export class SupabaseStorageProvider implements IStorageProvider {
         userRole: 'SUPER_ADMIN',
         action: 'CLEAR_TEST_DATA',
         entityType: 'SYSTEM',
-        details: `Cleared all test data (${deletedPayments || 0} payments, ${deletedDonors || 0} donors, ${deletedPavtis || 0} pavtis). Live data untouched.`,
+        details: `Cleared all test data (${deletedPayments || 0} payments, ${deletedDonors || 0} donors, ${deletedPavtis || 0} pavtis, ${deletedExpenses || 0} expenses). Live data untouched.`,
         mode: 'TEST',
       });
 
@@ -1215,6 +1737,7 @@ export class SupabaseStorageProvider implements IStorageProvider {
         deletedPayments: deletedPayments || 0,
         deletedDonors: deletedDonors || 0,
         deletedPavtis: deletedPavtis || 0,
+        deletedExpenses: deletedExpenses || 0,
       };
     } catch (err) {
       console.error('[SupabaseStorageProvider] clearTestData error:', err);
@@ -1230,20 +1753,31 @@ export class SupabaseStorageProvider implements IStorageProvider {
     if (user.userRole !== 'SUPER_ADMIN') {
       throw new Error('अनधिकृत: फक्त सुपर ॲडमिन संपूर्ण डेटा रीसेट करू शकतात.');
     }
-    if (confirmation !== 'RESET' && confirmation !== 'DELETE ALL DATA') {
-      throw new Error('अवैध पुष्टीकरण: कृपया अचूक "DELETE ALL DATA" टाईप करा.');
+
+    const clean = (confirmation || '').trim().toUpperCase();
+    if (clean !== 'RESET' && clean !== 'DELETE ALL DATA') {
+      throw new Error('अवैध पुष्टीकरण: कृपया अचूक "RESET" टाईप करा.');
     }
 
     if (!this.isConfigured) return this.fallbackProvider.resetAllData(confirmation, mode, user);
 
     try {
       const client = this.getClient();
-      await Promise.all([
-        client.from('pavtis').delete().eq('mode', mode),
-        client.from('payments').delete().eq('mode', mode),
-        client.from('donors').delete().eq('mode', mode),
-        client.from('receipt_counters').upsert({ mode: mode, last_number: 0, updated_at: new Date().toISOString() }),
-      ]);
+
+      // Sequential deletion to respect foreign keys
+      const { error: pavtisErr } = await client.from('pavtis').delete().eq('mode', mode);
+      if (pavtisErr) console.error('pavtis delete err:', pavtisErr);
+
+      const { error: paymentsErr } = await client.from('payments').delete().eq('mode', mode);
+      if (paymentsErr) console.error('payments delete err:', paymentsErr);
+
+      const { error: donorsErr } = await client.from('donors').delete().eq('mode', mode);
+      if (donorsErr) console.error('donors delete err:', donorsErr);
+
+      const { error: expensesErr } = await client.from('expenses').delete().eq('mode', mode);
+      if (expensesErr) console.error('expenses delete err:', expensesErr);
+
+      await client.from('receipt_counters').upsert({ mode: mode, last_number: 0, updated_at: new Date().toISOString() });
 
       await this.addAuditLog({
         userId: user.userId,
@@ -1266,7 +1800,7 @@ export class SupabaseStorageProvider implements IStorageProvider {
     if (!this.isConfigured) return this.fallbackProvider.exportBackup();
 
     try {
-      const [settings, users, announcements, liveDonors, testDonors, livePayments, testPayments, livePavtis, testPavtis, liveLogs, testLogs] =
+      const [settings, users, announcements, liveDonors, testDonors, livePayments, testPayments, livePavtis, testPavtis, liveExpenses, testExpenses, liveLogs, testLogs] =
         await Promise.all([
           this.getSettings(),
           this.getUsers(),
@@ -1277,6 +1811,8 @@ export class SupabaseStorageProvider implements IStorageProvider {
           this.getPayments('TEST'),
           this.getPavtis('LIVE'),
           this.getPavtis('TEST'),
+          this.getExpenses('LIVE'),
+          this.getExpenses('TEST'),
           this.getAuditLogs('LIVE', 1000),
           this.getAuditLogs('TEST', 1000),
         ]);
@@ -1291,12 +1827,14 @@ export class SupabaseStorageProvider implements IStorageProvider {
           donors: liveDonors,
           payments: livePayments,
           pavtis: livePavtis,
+          expenses: liveExpenses,
           auditLogs: liveLogs,
         },
         testData: {
           donors: testDonors,
           payments: testPayments,
           pavtis: testPavtis,
+          expenses: testExpenses,
           auditLogs: testLogs,
         },
       };
@@ -1315,22 +1853,18 @@ export class SupabaseStorageProvider implements IStorageProvider {
 
     try {
       const client = this.getClient();
-      // Save settings
       await this.saveSettings(backupData.settings);
 
-      // Save users
       for (const u of backupData.users) {
         await this.saveUser(u);
       }
 
-      // Save announcements
       if (backupData.announcements) {
         for (const a of backupData.announcements) {
           await this.saveAnnouncement(a);
         }
       }
 
-      // Restore Live Data
       for (const d of backupData.liveData.donors || []) {
         await this.saveDonor(d, 'LIVE');
       }
@@ -1340,8 +1874,10 @@ export class SupabaseStorageProvider implements IStorageProvider {
       for (const pav of backupData.liveData.pavtis || []) {
         await this.savePavti(pav, 'LIVE');
       }
+      for (const exp of backupData.liveData.expenses || []) {
+        await this.saveExpense(exp, 'LIVE');
+      }
 
-      // Restore Test Data
       for (const d of backupData.testData?.donors || []) {
         await this.saveDonor(d, 'TEST');
       }
@@ -1351,8 +1887,10 @@ export class SupabaseStorageProvider implements IStorageProvider {
       for (const pav of backupData.testData?.pavtis || []) {
         await this.savePavti(pav, 'TEST');
       }
+      for (const exp of backupData.testData?.expenses || []) {
+        await this.saveExpense(exp, 'TEST');
+      }
 
-      // Update counters
       const maxLiveNumber = (backupData.liveData.payments || [])
         .filter((p) => p.numericReceiptNumber)
         .reduce((max, p) => Math.max(max, p.numericReceiptNumber || 0), 0);
@@ -1539,6 +2077,26 @@ export class SupabaseStorageProvider implements IStorageProvider {
       mode: row.mode as AppMode,
       ipAddress: row.ip_address || undefined,
       timestamp: row.timestamp,
+    };
+  }
+
+  private mapExpenseFromDb(row: any): Expense {
+    return {
+      id: row.id,
+      expenseNumber: row.expense_number || undefined,
+      numericExpenseNumber: row.numeric_expense_number ? Number(row.numeric_expense_number) : undefined,
+      date: row.date,
+      spentFor: row.spent_for,
+      description: row.description || undefined,
+      amount: Number(row.amount || 0),
+      vendorPerson: row.vendor_person || undefined,
+      note: row.note || undefined,
+      addedBy: row.added_by || 'Admin',
+      addedById: row.added_by_id || undefined,
+      userRole: row.user_role as UserRole || 'HOST',
+      mode: row.mode as AppMode,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at,
     };
   }
 }

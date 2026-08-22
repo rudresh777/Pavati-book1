@@ -12,27 +12,30 @@ export async function GET(request: Request) {
 
     const { searchParams } = new URL(request.url);
     const mode = (searchParams.get('mode') as AppMode) || 'LIVE';
+    const targetDate = searchParams.get('date') || undefined;
 
     const storage = getStorageProvider();
     await storage.init();
 
-    const fullSummary = await storage.getCollectionSummary(mode);
+    const fullSummary = await (storage as any).getCollectionSummary(mode, targetDate);
     const isSuperAdmin = session.role === 'SUPER_ADMIN';
 
-    // STRICT SERVER-SIDE PRIVACY ENFORCEMENT:
-    // Only SUPER_ADMIN receives total collections, today's collection, and payment mode breakdowns.
-    // HOST receives only operational metrics (pending amount, pending count, paid count).
+    // SERVER-SIDE PRIVACY ENFORCEMENT:
+    // - SUPER_ADMIN receives overall lifetime totals, Today's Collection, and Collection History.
+    // - HOST receives Today's Collection and Collection History (without exposing lifetime totals).
     const summary = isSuperAdmin
       ? fullSummary
       : {
+          todayCollection: fullSummary.todayCollection,
+          yesterdayCollection: fullSummary.yesterdayCollection,
+          dailyHistory: fullSummary.dailyHistory || [],
           pendingAmount: fullSummary.pendingAmount,
           pendingDonorsCount: fullSummary.pendingDonorsCount,
           paidPavtisCount: fullSummary.paidPavtisCount,
+          partiallyPaidAmount: fullSummary.partiallyPaidAmount,
           mode: fullSummary.mode,
-          // Explicitly omit / nullify financial totals
+          // Explicitly omit / nullify lifetime financial totals for non-super-admins
           totalCollection: null,
-          todayCollection: null,
-          yesterdayCollection: null,
           thisWeekCollection: null,
           thisMonthCollection: null,
           currentYearCollection: null,

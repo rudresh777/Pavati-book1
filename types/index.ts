@@ -32,6 +32,7 @@ export interface MandalSettings {
   contactNumber: string;
   alternateContact?: string;
   whatsappGroupLink: string;
+  defaultWhatsAppMessage?: string;
   year: string; // e.g. "2026-2027" or "2026"
   logoUrl?: string; // Base64 data URL or Google Drive URL
   taglineMarathi: string; // e.g. "॥ श्री गणेशाय नमः ॥"
@@ -64,6 +65,17 @@ export interface Donor {
 export type PaymentStatus = 'DUE' | 'PAID' | 'CANCELLED' | 'PENDING' | 'PARTIALLY_PAID';
 export type PaymentMethod = 'CASH' | 'UPI' | 'DUE';
 
+export interface PaymentInstallment {
+  id: string;
+  amount: number;
+  paymentMethod: 'CASH' | 'UPI';
+  transactionReference?: string;
+  date: string; // YYYY-MM-DD
+  hostId?: string;
+  hostName?: string;
+  createdAt: string;
+}
+
 export interface Payment {
   id: string;
   receiptNumber?: string; // Formatted e.g. "000001" - assigned sequentially for ALL receipts (both PAID and DUE)
@@ -83,6 +95,7 @@ export interface Payment {
   hostName: string;
   notes?: string;
   mode: AppMode;
+  installments?: PaymentInstallment[];
   createdAt: string;
   updatedAt: string;
 }
@@ -113,8 +126,10 @@ export interface Announcement {
   id: string;
   titleMarathi: string;
   titleEnglish?: string;
+  titleOriginal?: string;
   contentMarathi: string;
   contentEnglish?: string;
+  contentOriginal?: string;
   date: string;
   time?: string;
   active: boolean;
@@ -132,7 +147,7 @@ export interface AuditLog {
   userName: string;
   userRole: UserRole;
   action: string;
-  entityType?: 'PAYMENT' | 'PAVTI' | 'DONOR' | 'SETTINGS' | 'USER' | 'ANNOUNCEMENT' | 'SYSTEM';
+  entityType?: 'PAYMENT' | 'PAVTI' | 'DONOR' | 'SETTINGS' | 'USER' | 'ANNOUNCEMENT' | 'EXPENSE' | 'SYSTEM';
   entityId?: string;
   details: string;
   mode: AppMode;
@@ -140,21 +155,67 @@ export interface AuditLog {
   timestamp: string;
 }
 
-export interface CollectionSummary {
+export interface Expense {
+  id: string;
+  expenseNumber?: string; // Formatted number e.g. "EXP-001" or "EXP-0001"
+  numericExpenseNumber?: number; // 1, 2, 3...
+  date: string; // YYYY-MM-DD
+  spentFor: string; // खर्च कशासाठी (Mandap, Decoration, Lighting, Prasad, Flower, Dhol/Band, Other/Custom)
+  description?: string; // तपशील
+  amount: number; // रक्कम
+  vendorPerson?: string; // Vendor / Person (व्यक्ती / व्यापारी)
+  note?: string; // Note / टीप
+  addedBy: string; // Name of Admin / Super Admin
+  addedById?: string;
+  userRole?: UserRole;
+  mode: AppMode;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface DailyExpenseRecord {
+  date: string; // YYYY-MM-DD
+  formattedDate: string; // DD/MM/YYYY
+  totalExpense: number;
+  expenseCount: number;
+}
+
+export interface ExpenseSummary {
+  todayExpense: number;
+  totalExpense: number;
+  yesterdayExpense: number;
+  thisMonthExpense: number;
+  todayBalance?: number; // Today's Collection minus Today's Expenses
+  totalBalance?: number; // Total Collection minus Total Expenses
+  mode: AppMode;
+  dailyHistory?: DailyExpenseRecord[];
+}
+
+export interface DailyCollectionRecord {
+  date: string; // YYYY-MM-DD
+  formattedDate: string; // DD/MM/YYYY
+  cashCollection: number;
+  upiCollection: number;
   totalCollection: number;
-  todayCollection: number;
-  yesterdayCollection: number;
-  thisWeekCollection: number;
-  thisMonthCollection: number;
-  currentYearCollection: number;
+  receiptCount: number;
+}
+
+export interface CollectionSummary {
+  totalCollection: number | null;
+  todayCollection: number | null;
+  yesterdayCollection: number | null;
+  thisWeekCollection: number | null;
+  thisMonthCollection: number | null;
+  currentYearCollection: number | null;
   paidPavtisCount: number;
   pendingAmount: number; // Sum of active DUE / PENDING
   pendingDonorsCount: number; // Count of active DUE / PENDING
   partiallyPaidAmount: number;
-  cashCollection: number;
-  upiCollection: number;
-  otherCollection: number;
+  cashCollection: number | null;
+  upiCollection: number | null;
+  otherCollection: number | null;
   mode: AppMode;
+  dailyHistory?: DailyCollectionRecord[];
 }
 
 export interface AuthSession {
@@ -163,3 +224,4 @@ export interface AuthSession {
   email: string;
   role: UserRole;
 }
+

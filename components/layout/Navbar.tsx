@@ -10,6 +10,7 @@ import {
   Clock,
   Users,
   CreditCard,
+  Wallet,
   Settings,
   LogOut,
   Sparkles,
@@ -18,6 +19,7 @@ import {
   Sliders,
   Database,
   History,
+  KeyRound,
   ChevronDown,
 } from 'lucide-react';
 import { useAppMode } from '@/lib/context/mode-context';
@@ -32,7 +34,7 @@ interface NavbarProps {
 export function Navbar({ mandalName = 'मोरया गणेशोत्सव मंडळ' }: NavbarProps) {
   const pathname = usePathname();
   const router = useRouter();
-  const { mode, toggleMode, user } = useAppMode();
+  const { mode, toggleMode, user, setUser } = useAppMode();
   const { language, setLanguage, t } = useLanguage();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
@@ -58,6 +60,7 @@ export function Navbar({ mandalName = 'मोरया गणेशोत्स�
   const handleLogout = async () => {
     try {
       setIsLoggingOut(true);
+      setUser(null);
       await fetch('/api/auth/logout', { method: 'POST' });
       router.push('/login');
       router.refresh();
@@ -77,20 +80,24 @@ export function Navbar({ mandalName = 'मोरया गणेशोत्स�
     { href: '/pending', label: t('nav.pending'), icon: Clock },
     { href: '/donors', label: t('nav.donors'), icon: Users },
     { href: '/payments', label: t('nav.ledger'), icon: CreditCard },
+    { href: '/expenses', label: t('nav.expenses'), icon: Wallet },
   ];
 
-  // Super Admin items
+  // Super Admin items (Notice/Announcement tab name always remains Marathi)
   const superAdminNavItems = [
+    { href: '/expenses', label: t('nav.expenses'), icon: Wallet },
     { href: '/settings/mandal', label: t('nav.mandalSettings'), icon: Sliders },
     { href: '/settings/users', label: t('nav.hostManagement'), icon: Users },
+    { href: '/settings/passwords', label: t('nav.passwordManagement'), icon: KeyRound },
     { href: '/settings/backup', label: t('nav.backupData'), icon: Database },
-    { href: '/announcements/manage', label: t('nav.announcementManage'), icon: Bell },
+    { href: '/announcements/manage', label: 'सूचना व्यवस्थापन', icon: Bell },
     { href: '/audit-log', label: t('nav.auditLog'), icon: History },
   ];
 
   // Host/Admin items
   const hostNavItems = [
-    { href: '/announcements/manage', label: t('nav.announcementManage'), icon: Bell },
+    { href: '/expenses', label: t('nav.expenses'), icon: Wallet },
+    { href: '/announcements/manage', label: 'सूचना व्यवस्थापन', icon: Bell },
   ];
 
   const visibleAdminItems = isSuperAdmin ? superAdminNavItems : hostNavItems;

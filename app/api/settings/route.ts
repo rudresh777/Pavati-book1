@@ -3,6 +3,9 @@ import { getStorageProvider } from '@/lib/storage';
 import { getSession } from '@/lib/auth/session';
 import { MandalSettings } from '@/types';
 
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 export async function GET() {
   try {
     const storage = getStorageProvider();

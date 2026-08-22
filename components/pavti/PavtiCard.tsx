@@ -1,9 +1,30 @@
 'use client';
 
 import React from 'react';
+import {
+  FileText,
+  Calendar,
+  User,
+  Phone,
+  PenTool,
+  Banknote,
+  Smartphone,
+  AlertTriangle,
+} from 'lucide-react';
 import { MandalSettings, Pavti } from '@/types';
-import { formatIndianCurrency } from '@/lib/utils/number-to-words';
+import {
+  formatIndianCurrency,
+  numberToWordsEnglish,
+  numberToWordsMarathi,
+} from '@/lib/utils/number-to-words';
 import { useLanguage } from '@/lib/context/language-context';
+import {
+  CornerOrnament,
+  FloralDivider,
+  RupeeMedallion,
+  TempleSilhouette,
+  OfficialStamp,
+} from './PavtiOrnaments';
 
 interface PavtiCardProps {
   pavti: Pavti;
@@ -11,232 +32,394 @@ interface PavtiCardProps {
   id?: string;
 }
 
-export function PavtiCard({ pavti, settings, id = 'digital-pavti-receipt' }: PavtiCardProps) {
-  const { language } = useLanguage();
-  const enabledDesignations = (settings?.designations || []).filter((d) => d.enabled && d.name);
-  const isDue = pavti.status === 'DUE' || !pavti.receiptNumber;
+/**
+ * Formats a date string reliably to DD-MM-YYYY
+ */
+function formatReceiptDate(dateStr: string): string {
+  if (!dateStr) return '';
+  if (/^\d{2}-\d{2}-\d{4}$/.test(dateStr)) return dateStr;
+  try {
+    const d = new Date(dateStr);
+    if (!isNaN(d.getTime())) {
+      const day = String(d.getDate()).padStart(2, '0');
+      const month = String(d.getMonth() + 1).padStart(2, '0');
+      const year = d.getFullYear();
+      return `${day}-${month}-${year}`;
+    }
+  } catch {}
+  return dateStr;
+}
 
+export function PavtiCard({
+  pavti,
+  settings,
+  id = 'digital-pavti-receipt',
+}: PavtiCardProps) {
+  const { language } = useLanguage();
   const isEn = language === 'en';
 
-  // Amount in words strictly following selected language
+  const enabledDesignations = (settings?.designations || []).filter(
+    (d) => d.enabled && d.name
+  );
+
+  const isDue =
+    pavti.status === 'DUE' ||
+    !pavti.paymentMethod ||
+    pavti.paymentMethod === 'DUE';
+
+  // Amount in words
   const amountWords = isEn
-    ? pavti.amountInWordsEnglish || pavti.amountInWordsMarathi
-    : pavti.amountInWordsMarathi || pavti.amountInWordsEnglish;
+    ? pavti.amountInWordsEnglish || numberToWordsEnglish(pavti.amount)
+    : pavti.amountInWordsMarathi || numberToWordsMarathi(pavti.amount);
+
+  // Format Receipt Number
+  const rawReceiptNum = pavti.receiptNumber || '000001';
+  const displayReceiptNumber = rawReceiptNum.startsWith('#')
+    ? rawReceiptNum
+    : `#${rawReceiptNum}`;
+
+  const formattedDate = formatReceiptDate(pavti.date);
+
+  // Clean numeric amount without rupee symbol for custom bold rendering
+  const formattedAmountNum = formatIndianCurrency(pavti.amount).replace('₹', '').trim();
+
+  // Payment method label and icon
+  const isUPI = pavti.paymentMethod === 'UPI';
+  const paymentModeLabel = isDue
+    ? (isEn ? 'DUE' : 'बाकी')
+    : isUPI
+    ? 'UPI'
+    : 'Cash';
 
   return (
-    <div className="w-full max-w-xl mx-auto p-2 sm:p-4">
+    <div className="w-full max-w-[620px] mx-auto p-1 sm:p-2">
       {/* 
-        Official Traditional Indian Mandal Receipt Book Layout
-        Theme: Saffron / Gold / Warm White with decorative ethnic borders
+        ========================================================================
+        OFFICIAL PREMIUM GANPATI MANDAL DONATION PAVTI
+        Design: Dedicated Right-Side Ganpati Artwork + Structured Left/Center Form
+        ========================================================================
       */}
       <div
         id={id}
-        className="relative bg-[#fffdfa] text-stone-900 border-[3px] border-amber-600 rounded-2xl shadow-pavti overflow-hidden p-6 sm:p-8 space-y-4"
+        className="relative bg-[#fffefb] text-stone-900 rounded-2xl overflow-hidden shadow-2xl transition-all select-none border-[3px] border-[#b45309]"
         style={{
-          boxShadow: '0 10px 30px -5px rgba(234, 88, 12, 0.15), 0 0 0 1px rgba(217, 119, 6, 0.2)',
+          boxShadow:
+            '0 15px 35px -5px rgba(180, 83, 9, 0.2), 0 0 0 1px rgba(217, 119, 6, 0.25)',
+          background:
+            'linear-gradient(180deg, #fffdf8 0%, #fffbf2 40%, #fffdf8 100%)',
         }}
       >
-        {/* Subtle Watermark in Center */}
-        <div className="absolute inset-0 flex items-center justify-center opacity-5 pointer-events-none select-none text-[16rem] font-black font-devanagari text-orange-950">
-          ॐ
-        </div>
+        {/* ====================================================================
+            LAYER 0: DECORATIVE CORNER FILIGREE & INNER BORDERS
+            ==================================================================== */}
+        <div className="absolute inset-1.5 sm:inset-2 rounded-xl border border-amber-600/35 pointer-events-none z-10" />
+        <div className="absolute inset-2.5 sm:inset-3 rounded-lg border border-dashed border-amber-500/30 pointer-events-none z-10" />
 
-        {/* TOP HEADER SECTION: FIXED MANDAL IDENTITY (NEVER TRANSLATED) */}
-        <div className="relative z-10 text-center space-y-1 pb-3 border-b-2 border-amber-600/60">
-          {/* TOP AUSPICIOUS SLOGAN */}
-          <div className="flex items-center justify-center gap-2 text-xs sm:text-sm font-bold text-amber-900 font-devanagari">
-            <span>{settings?.taglineMarathi || '॥ श्री गणेशाय नमः ॥'}</span>
-            <span>•</span>
-            <span>सन {settings?.year || '२०२६'}</span>
-            {settings?.sloganMarathi && (
-              <>
-                <span>•</span>
-                <span>{settings.sloganMarathi}</span>
-              </>
-            )}
+        {/* 4 Corner Traditional Filigree */}
+        <CornerOrnament position="top-left" className="absolute top-1 left-1 z-20 opacity-80" />
+        <CornerOrnament position="top-right" className="absolute top-1 right-1 z-20 opacity-80" />
+        <CornerOrnament position="bottom-left" className="absolute bottom-1 left-1 z-20 opacity-80" />
+        <CornerOrnament position="bottom-right" className="absolute bottom-1 right-1 z-20 opacity-80" />
+
+        {/* ====================================================================
+            LAYER 1: MAIN RECEIPT CONTENT CONTAINER
+            ==================================================================== */}
+        <div className="relative z-20 px-4 sm:px-6 pt-3 pb-3 space-y-3">
+          {/* ------------------------------------------------------------------
+              1. TOP AUSPICIOUS SLOGAN (STRICTLY MARATHI: वर्ष १६)
+              ------------------------------------------------------------------ */}
+          <div className="text-center pt-0.5">
+            <div className="inline-flex items-center justify-center gap-1.5 sm:gap-2.5 text-[11px] sm:text-[13px] font-bold text-[#451806] font-devanagari tracking-wide drop-shadow-sm">
+              <span>॥ श्री गणेशाय नमः ॥</span>
+              <span className="text-[#a1400e] font-extrabold">•</span>
+              <span className="text-[#641b06] font-extrabold">वर्ष १६</span>
+              <span className="text-[#a1400e] font-extrabold">•</span>
+              <span>॥ गणपती बाप्पा मोरया ॥</span>
+            </div>
+            {/* Ornate Gold Floral Divider */}
+            <FloralDivider className="opacity-80 my-0.5" />
           </div>
 
-          {/* MANDAL TITLE */}
-          <div className="pt-2">
-            <h1 className="text-2xl sm:text-3xl font-extrabold text-orange-700 font-devanagari tracking-tight drop-shadow-sm">
-              {settings?.mandalNameMarathi || 'मोरया गणेशोत्सव मंडळ'}
-            </h1>
-            {settings?.addressMarathi && (
-              <div className="text-xs sm:text-sm font-semibold text-amber-900 font-devanagari mt-0.5">
-                {settings.addressMarathi}
+          {/* ------------------------------------------------------------------
+              2. TOP SECTION: MANDAL IDENTITY (LEFT) + GANPATI ARTWORK (RIGHT)
+              ------------------------------------------------------------------ */}
+          <div className="grid grid-cols-12 gap-2 sm:gap-3 items-center">
+            {/* LEFT 7-COLUMNS: MANDAL NAME, ADDRESS, LOCATION & RECEIPT BADGES */}
+            <div className="col-span-12 sm:col-span-7 space-y-2 text-left pl-1">
+              {/* Mandal Name */}
+              <div className="space-y-0.5">
+                <h1
+                  className="text-2xl sm:text-3xl font-black font-devanagari tracking-tight leading-tight"
+                  style={{
+                    color: '#70081e',
+                    textShadow:
+                      '0 1px 2px rgba(112, 8, 30, 0.25), 0 2px 8px rgba(245, 158, 11, 0.25)',
+                  }}
+                >
+                  {settings?.mandalNameMarathi || 'मोरया गणेशोत्सव मंडळ'}
+                </h1>
               </div>
-            )}
-          </div>
 
-          {/* LOCATION & REG DETAILS */}
-          <div className="text-xs text-stone-600 flex flex-wrap items-center justify-center gap-x-3 gap-y-0.5 pt-0.5 font-devanagari">
-            {settings?.locationMarathi && <span>📍 {settings.locationMarathi}</span>}
-            {settings?.regNumber && <span>| नोंदणी क्र. {settings.regNumber}</span>}
-            {settings?.contactNumber && <span>| 📞 {settings.contactNumber}</span>}
-          </div>
-        </div>
+              {/* Address Badge Ribbon */}
+              <div className="inline-block">
+                <div
+                  className="px-2.5 sm:px-3 py-0.5 rounded-md text-[10px] sm:text-[11px] font-bold text-white font-devanagari tracking-wide shadow-sm"
+                  style={{
+                    background: 'linear-gradient(135deg, #571309 0%, #3e0c05 100%)',
+                    boxShadow: '0 2px 4px rgba(62, 12, 5, 0.3)',
+                    border: '1px solid rgba(251, 191, 36, 0.5)',
+                  }}
+                >
+                  {settings?.addressMarathi || 'तापडिया नगर अकोला 444001'}
+                </div>
+              </div>
 
-        {/* RECEIPT NUMBER & DATE HEADER */}
-        <div className="relative z-10 flex items-center justify-between py-3 border-b border-amber-200/80 text-sm">
-          <div className="flex items-center gap-2">
-            <span className="font-bold text-amber-900 font-devanagari">
-              {isEn ? 'Receipt No :' : 'पावती क्र. :'}
-            </span>
-            <span className="font-mono font-bold text-base px-2.5 py-0.5 bg-amber-50 text-orange-800 border border-amber-300 rounded shadow-inner">
-              #{pavti.receiptNumber || '000001'}
-            </span>
-            {isDue && (
-              <span className="font-bold text-xs px-2.5 py-0.5 bg-amber-200 text-amber-950 border border-amber-400 rounded shadow-sm font-devanagari">
-                {isEn ? 'DUE' : 'बाकी'}
-              </span>
-            )}
-          </div>
+              {/* Location Tag */}
+              <div className="flex items-center gap-1 text-[11px] sm:text-xs font-bold text-[#451806] font-devanagari pt-0.5">
+                <span className="text-red-600">📍</span>
+                <span>{settings?.locationMarathi || 'अकोला, महाराष्ट्र'}</span>
+              </div>
 
-          <div className="flex items-center gap-2">
-            <span className="font-bold text-amber-900 font-devanagari">
-              {isEn ? 'Date :' : 'दिनांक :'}
-            </span>
-            <span className="font-medium text-stone-800 font-mono">
-              {pavti.date}
-            </span>
-          </div>
-        </div>
+              {/* RECEIPT NO & DATE BADGES */}
+              <div className="grid grid-cols-2 gap-2 pt-1">
+                {/* Receipt Number Badge */}
+                <div className="flex items-center gap-1.5 p-1.5 rounded-xl bg-[#fffdf7] border border-[#d6aa65] shadow-sm">
+                  <div className="w-6 h-6 sm:w-7 sm:h-7 rounded-full bg-[#691807] text-white flex items-center justify-center flex-shrink-0 shadow-inner">
+                    <FileText className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-amber-200" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="text-[9px] sm:text-[10px] font-semibold text-stone-600 leading-tight font-devanagari">
+                      {isEn ? 'Receipt No.' : 'पावती क्र.'}
+                    </div>
+                    <div className="mt-0.5">
+                      <span className="inline-block font-mono font-black text-[11px] sm:text-xs px-1.5 py-0.5 rounded bg-[#571309] text-white shadow-inner tracking-wide">
+                        {displayReceiptNumber}
+                      </span>
+                    </div>
+                  </div>
+                </div>
 
-        {/* MAIN BODY - DONOR & CONTRIBUTION DETAILS */}
-        <div className="relative z-10 py-4 space-y-3.5">
-          {/* DONOR NAME */}
-          <div className="flex flex-col sm:flex-row sm:items-baseline gap-1 sm:gap-2">
-            <span className="text-xs sm:text-sm font-bold text-amber-900 whitespace-nowrap font-devanagari">
-              {isEn ? 'Donor Name :' : 'देणगीदाराचे नाव :'}
-            </span>
-            <div className="flex-1 font-bold text-base sm:text-lg text-stone-900 border-b border-dotted border-amber-600/70 pb-0.5 px-1 font-devanagari">
-              {pavti.donorName}
+                {/* Date Badge */}
+                <div className="flex items-center gap-1.5 p-1.5 rounded-xl bg-[#fffdf7] border border-[#d6aa65] shadow-sm">
+                  <div className="w-6 h-6 sm:w-7 sm:h-7 rounded-full bg-[#691807] text-white flex items-center justify-center flex-shrink-0 shadow-inner">
+                    <Calendar className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-amber-200" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="text-[9px] sm:text-[10px] font-semibold text-stone-600 leading-tight font-devanagari">
+                      {isEn ? 'Date' : 'दिनांक'}
+                    </div>
+                    <div className="text-[11px] sm:text-xs font-bold text-stone-900 font-mono tracking-tight mt-0.5 truncate">
+                      {formattedDate}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* RIGHT 5-COLUMNS: DEDICATED VISUAL GANPATI ARTWORK PANEL */}
+            <div className="col-span-12 sm:col-span-5 flex justify-center sm:justify-end">
+              <div
+                className="relative w-full max-w-[210px] sm:max-w-[230px] h-[180px] sm:h-[210px] rounded-2xl overflow-hidden border-2 border-[#d6aa65]/70 shadow-md flex items-center justify-center"
+                style={{
+                  background:
+                    'radial-gradient(circle at 50% 35%, rgba(254, 243, 199, 0.9) 0%, rgba(255, 251, 235, 0.8) 55%, #fffdf8 100%)',
+                }}
+              >
+                {/* Radiant Golden Sunburst Glow Behind Ganpati */}
+                <div
+                  className="absolute inset-0 pointer-events-none"
+                  style={{
+                    background:
+                      'radial-gradient(circle at 50% 35%, rgba(251, 191, 36, 0.45) 0%, rgba(245, 158, 11, 0.2) 50%, transparent 75%)',
+                  }}
+                />
+
+                {/* Exact Ganpati Idol Artwork (Fully Visible, High-Resolution, Perfectly Framed) */}
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src="/images/ganpati.jpg"
+                  alt="श्री गणपती बाप्पा"
+                  className="w-full h-full object-cover object-[center_12%] transition-transform duration-300"
+                  style={{
+                    filter: 'contrast(1.05) saturate(1.08)',
+                  }}
+                  crossOrigin="anonymous"
+                />
+
+                {/* Subtle soft edge gradient transitions */}
+                <div className="absolute inset-0 bg-gradient-to-t from-[#fffdf8]/60 via-transparent to-transparent pointer-events-none" />
+                <div className="absolute inset-0 rounded-2xl border border-amber-400/40 pointer-events-none" />
+              </div>
             </div>
           </div>
 
-          {/* MOBILE NUMBER & ADDRESS */}
-          {(pavti.donorMobile || pavti.donorAddress) && (
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-              {pavti.donorMobile && (
-                <div className="flex items-baseline gap-2">
-                  <span className="text-xs font-bold text-amber-900 whitespace-nowrap font-devanagari">
+          {/* ------------------------------------------------------------------
+              3. DONOR INFORMATION CARD (ELEGANT PARCHMENT CONTAINER)
+              ------------------------------------------------------------------ */}
+          <div
+            className="rounded-xl p-2.5 sm:p-3 space-y-2 border border-[#d6aa65] shadow-sm"
+            style={{
+              background: 'rgba(255, 253, 247, 0.95)',
+              boxShadow: 'inset 0 1px 3px rgba(217, 119, 6, 0.05)',
+            }}
+          >
+            {/* ROW 1: DONOR NAME */}
+            <div className="flex items-center gap-2">
+              <div className="w-6 h-6 sm:w-7 sm:h-7 rounded-full bg-[#691807] text-amber-200 flex items-center justify-center flex-shrink-0 shadow-sm">
+                <User className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
+              </div>
+              <div className="flex-1 flex items-baseline gap-2 min-w-0">
+                <span className="text-[11px] sm:text-xs font-bold text-[#451806] whitespace-nowrap font-devanagari">
+                  {isEn ? 'Donor Name :' : 'देणगीदाराचे नाव :'}
+                </span>
+                <span className="font-bold text-sm sm:text-base text-stone-950 font-devanagari truncate">
+                  {pavti.donorName || (isEn ? 'Anonymous Donor' : 'देणगीदार')}
+                </span>
+              </div>
+            </div>
+
+            {/* ROW 2: MOBILE & ADDRESS */}
+            <div className="grid grid-cols-1 sm:grid-cols-12 gap-1.5 sm:gap-2 items-center text-xs pt-1 border-t border-dotted border-[#c89d54]/60">
+              {/* Mobile */}
+              <div className="sm:col-span-6 flex items-center gap-2">
+                <div className="w-6 h-6 sm:w-7 sm:h-7 rounded-full bg-[#691807] text-amber-200 flex items-center justify-center flex-shrink-0 shadow-sm">
+                  <Phone className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
+                </div>
+                <div className="flex-1 flex items-baseline gap-2 min-w-0">
+                  <span className="text-[11px] sm:text-xs font-bold text-[#451806] whitespace-nowrap font-devanagari">
                     {isEn ? 'Mobile :' : 'मोबाईल :'}
                   </span>
-                  <div className="flex-1 text-xs sm:text-sm font-medium text-stone-800 border-b border-dotted border-amber-600/70 pb-0.5 px-1 font-mono">
-                    {pavti.donorMobile}
-                  </div>
-                </div>
-              )}
-              {pavti.donorAddress && (
-                <div className="flex items-baseline gap-2">
-                  <span className="text-xs font-bold text-amber-900 whitespace-nowrap font-devanagari">
-                    {isEn ? 'Address :' : 'पत्ता :'}
+                  <span className="font-mono font-bold text-xs sm:text-sm text-stone-900 truncate">
+                    {pavti.donorMobile || '-'}
                   </span>
-                  <div className="flex-1 text-xs sm:text-sm font-medium text-stone-800 border-b border-dotted border-amber-600/70 pb-0.5 px-1 truncate font-devanagari">
-                    {pavti.donorAddress}
-                  </div>
                 </div>
-              )}
-            </div>
-          )}
+              </div>
 
-          {/* AMOUNT IN WORDS (PURE SINGLE LANGUAGE) */}
-          <div className="flex flex-col sm:flex-row sm:items-baseline gap-1 sm:gap-2">
-            <span className="text-xs sm:text-sm font-bold text-amber-900 whitespace-nowrap font-devanagari">
-              {isEn ? 'In Words :' : 'अक्षरी :'}
-            </span>
-            <div className="flex-1 font-semibold text-sm sm:text-base text-stone-900 border-b border-dotted border-amber-600/70 pb-0.5 px-1 font-devanagari text-orange-950">
-              {amountWords}
+              {/* Address */}
+              <div className="sm:col-span-6 flex items-baseline gap-1.5 pl-8 sm:pl-0 min-w-0">
+                <span className="text-[11px] sm:text-xs font-bold text-[#451806] whitespace-nowrap font-devanagari">
+                  {isEn ? 'Address :' : 'पत्ता :'}
+                </span>
+                <span
+                  className="font-medium text-[11px] sm:text-xs text-stone-800 font-devanagari truncate"
+                  title={pavti.donorAddress || ''}
+                >
+                  {pavti.donorAddress || (isEn ? 'Not specified' : 'उल्लेख नाही')}
+                </span>
+              </div>
+            </div>
+
+            {/* ROW 3: AMOUNT IN WORDS */}
+            <div className="flex items-center gap-2 pt-1 border-t border-dotted border-[#c89d54]/60">
+              <div className="w-6 h-6 sm:w-7 sm:h-7 rounded-full bg-[#691807] text-amber-200 flex items-center justify-center flex-shrink-0 shadow-sm">
+                <PenTool className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
+              </div>
+              <div className="flex-1 flex items-baseline gap-2 min-w-0">
+                <span className="text-[11px] sm:text-xs font-bold text-[#451806] whitespace-nowrap font-devanagari">
+                  {isEn ? 'In Words :' : 'रक्कम अक्षरी :'}
+                </span>
+                <span className="text-xs sm:text-sm font-semibold text-stone-800 font-devanagari italic truncate">
+                  {amountWords}
+                </span>
+              </div>
             </div>
           </div>
 
-          {/* AMOUNT BOX & PAYMENT STATUS */}
-          <div className={`pt-2 flex flex-col sm:flex-row items-center justify-between gap-3 p-3.5 rounded-xl border ${
-            isDue ? 'bg-amber-50/90 border-amber-400' : 'bg-amber-50/80 border-amber-300'
-          }`}>
-            {/* Amount Box */}
-            <div className="flex items-center gap-3 w-full sm:w-auto">
-              <span className="font-bold text-base text-amber-950 font-devanagari">
-                {isDue ? (isEn ? 'Due Amount :' : 'बाकी रक्कम :') : (isEn ? 'Amount Paid :' : 'जमा रक्कम :')}
-              </span>
-              <div className={`px-4 py-1.5 text-white font-extrabold text-xl sm:text-2xl rounded-lg shadow font-mono tracking-tight ${
-                isDue ? 'bg-amber-600' : 'bg-orange-600'
-              }`}>
-                {formatIndianCurrency(pavti.amount)}
+          {/* ------------------------------------------------------------------
+              4. AMOUNT PAID & PAYMENT MODE (PROMINENT HIGHLIGHT SECTION)
+              ------------------------------------------------------------------ */}
+          <div
+            className="rounded-xl p-2.5 sm:p-3 border border-[#d6aa65] shadow-sm flex items-center justify-between gap-2"
+            style={{
+              background:
+                'linear-gradient(135deg, rgba(255, 252, 240, 0.98) 0%, rgba(254, 245, 215, 0.92) 100%)',
+            }}
+          >
+            {/* LEFT: RUPEE MEDALLION + AMOUNT PAID */}
+            <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+              <RupeeMedallion />
+              <div className="min-w-0">
+                <div className="text-[11px] sm:text-xs font-bold text-[#451806] font-devanagari leading-tight">
+                  {isDue
+                    ? (isEn ? 'Due Amount' : 'बाकी रक्कम')
+                    : (isEn ? 'Amount Paid' : 'जमा रक्कम')}
+                </div>
+                <div className="flex items-baseline gap-0.5">
+                  <span className="text-xl sm:text-2xl font-black text-[#c2410c] font-devanagari">
+                    ₹
+                  </span>
+                  <span
+                    className="text-2xl sm:text-3xl font-black font-mono tracking-tight leading-none"
+                    style={{ color: '#c2410c' }}
+                  >
+                    {formattedAmountNum}
+                  </span>
+                </div>
               </div>
             </div>
 
-            {/* Payment Status & Method */}
-            <div className="flex flex-wrap items-center gap-2 text-xs sm:text-sm text-stone-700 w-full sm:w-auto justify-start sm:justify-end font-devanagari">
-              <span className="font-semibold text-amber-900">
-                {isDue ? (isEn ? 'Status :' : 'स्थिती :') : (isEn ? 'Mode :' : 'प्रकार :')}
-              </span>
-              {isDue ? (
-                <span className="px-3 py-1 bg-amber-200 border border-amber-400 rounded-md font-bold text-amber-950">
-                  {isEn ? 'DUE' : 'बाकी'}
+            {/* RIGHT: MODE OF PAYMENT */}
+            <div className="flex flex-col items-end pl-2">
+              <div className="text-[10px] sm:text-[11px] font-bold text-stone-600 font-devanagari text-right mb-1">
+                {isEn ? 'Mode of Payment' : 'देयक पद्धत'}
+              </div>
+              <div className="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-white border border-[#d6aa65] shadow-sm">
+                {isDue ? (
+                  <AlertTriangle className="w-4 h-4 text-amber-600 flex-shrink-0" />
+                ) : isUPI ? (
+                  <Smartphone className="w-4 h-4 text-[#70081e] flex-shrink-0" />
+                ) : (
+                  <div className="w-5 h-4 bg-[#691807] text-white rounded flex items-center justify-center text-[10px]">
+                    <Banknote className="w-3.5 h-3.5 text-amber-200" />
+                  </div>
+                )}
+                <span className="font-bold text-xs sm:text-sm text-stone-900 font-devanagari">
+                  {paymentModeLabel}
                 </span>
-              ) : (
-                <span className="px-2.5 py-0.5 bg-white border border-amber-300 rounded font-semibold text-orange-800">
-                  {pavti.paymentMethod === 'UPI' ? (isEn ? 'UPI' : 'यूपीआय') : (isEn ? 'Cash' : 'रोख')}
-                </span>
-              )}
-              {pavti.transactionReference && (
-                <span className="text-xs text-stone-500 font-mono">
-                  (Ref: {pavti.transactionReference})
-                </span>
-              )}
+              </div>
             </div>
           </div>
-        </div>
 
-        {/* FOOTER SECTION: MANDAL OFFICIALS & DIGITAL STAMP */}
-        <div className="relative z-10 pt-4 border-t-2 border-amber-600/60 flex flex-col sm:flex-row items-center justify-between gap-4">
-          {/* Enabled Committee Designations / Blessing */}
-          {enabledDesignations.length > 0 ? (
-            <div className="flex flex-wrap items-center gap-4 text-center sm:text-left">
-              {enabledDesignations.map((desig) => (
-                <div key={desig.id} className="space-y-0.5">
-                  <div className="text-[11px] font-bold text-amber-900 font-devanagari">
-                    {desig.titleMarathi}
-                  </div>
-                  <div className="text-xs font-semibold text-stone-800">
-                    {desig.name}
-                  </div>
+          {/* ------------------------------------------------------------------
+              5. FOOTER WITH BLESSING, TEMPLE SILHOUETTE & OFFICIAL STAMP
+              ------------------------------------------------------------------ */}
+          <div className="relative pt-1 pb-1">
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-3 relative z-10">
+              {/* Left: Traditional Gratitude & Blessing / Committee Designations */}
+              <div className="text-center sm:text-left space-y-0.5">
+                <div className="text-xs sm:text-[13px] font-bold text-[#451806] font-devanagari">
+                  आपल्या उदार देणगीबद्दल मनःपूर्वक धन्यवाद!
                 </div>
-              ))}
-            </div>
-          ) : (
-            <div className="text-xs text-stone-600 font-devanagari">
-              {isEn
-                ? 'Thank you for your generous contribution!'
-                : 'श्रींच्या चरणी सादर केलेली सेवा व देणगी बद्दल धन्यवाद!'}
-            </div>
-          )}
+                <div className="text-[11px] sm:text-xs font-semibold text-[#641b06] font-devanagari">
+                  • ॥ गणपती बाप्पा मोरया ॥ •
+                </div>
 
-          {/* DIGITAL STAMP */}
-          <div className="flex flex-col items-center">
-            {isDue ? (
-              <div className="px-4 py-2 rounded-xl border-2 border-dashed border-amber-500 bg-amber-50 text-center shadow-inner">
-                <span className="text-[10px] uppercase font-bold text-amber-800 tracking-wider block font-devanagari">
-                  {isEn ? 'Official Record' : 'अधिकृत नोंद'}
-                </span>
-                <span className="text-sm font-black text-amber-900 font-devanagari tracking-wider">
-                  {isEn ? 'DUE' : 'बाकी'}
-                </span>
+                {/* Optional Committee Designations if enabled */}
+                {enabledDesignations.length > 0 && (
+                  <div className="flex flex-wrap items-center justify-center sm:justify-start gap-x-3 gap-y-0.5 pt-1 text-[10px] text-stone-700 font-devanagari">
+                    {enabledDesignations.map((d) => (
+                      <span key={d.id}>
+                        <strong className="text-[#451806]">{d.titleMarathi}:</strong> {d.name}
+                      </span>
+                    ))}
+                  </div>
+                )}
               </div>
-            ) : (
-              <div className="stamp-paid">
-                <span className="text-xs tracking-wider">
-                  {isEn ? 'Official Receipt' : 'अधिकृत पावती'}
-                </span>
-                <span className="text-sm font-black tracking-widest font-mono">
-                  {isEn ? 'PAID' : 'जमा'}
-                </span>
+
+              {/* Right: Official Stamp Seal */}
+              <div className="flex-shrink-0">
+                <OfficialStamp
+                  status={isDue ? 'DUE' : 'PAID'}
+                  authId={pavti.id ? `pavti-${pavti.id.slice(0, 4)}` : undefined}
+                  isEn={isEn}
+                />
               </div>
-            )}
-            <span className="text-[9px] text-stone-400 font-mono pt-1">
-              Auth ID: {pavti.id.substring(0, 10)}
-            </span>
+            </div>
+
+            {/* Bottom Temple Silhouette Motif */}
+            <div className="pt-2 opacity-75 overflow-hidden">
+              <TempleSilhouette className="h-6 sm:h-7" />
+            </div>
           </div>
         </div>
       </div>

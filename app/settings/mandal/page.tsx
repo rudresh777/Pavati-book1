@@ -321,7 +321,7 @@ export default function MandalSettingsPage() {
                 onChange={(e) =>
                   setSettings({ ...settings, contactNumber: e.target.value })
                 }
-                placeholder="9876543210"
+                placeholder={isEn ? "e.g. 9876543210" : "उदा. ९८७६५४३२१०"}
                 className="w-full px-3.5 py-2.5 bg-white border border-stone-300 rounded-lg text-sm text-stone-900 font-mono focus:ring-2 focus:ring-orange-500"
               />
             </div>
@@ -336,7 +336,7 @@ export default function MandalSettingsPage() {
                 onChange={(e) =>
                   setSettings({ ...settings, alternateContact: e.target.value })
                 }
-                placeholder="9123456789"
+                placeholder={isEn ? "e.g. 9123456789" : "उदा. ९१२३४५६७८९"}
                 className="w-full px-3.5 py-2.5 bg-white border border-stone-300 rounded-lg text-sm text-stone-900 font-mono focus:ring-2 focus:ring-orange-500"
               />
             </div>
@@ -372,6 +372,32 @@ export default function MandalSettingsPage() {
               {isEn
                 ? 'Example: https://chat.whatsapp.com/XXXXXXXX — Donors can click this link to voluntarily join the WhatsApp group after receipt generation.'
                 : 'उदा. https://chat.whatsapp.com/XXXXXXXX — पावती तयार झाल्यानंतर भाविक या लिंकवरून स्वेच्छेने ग्रुपमध्ये सामील होऊ शकतात.'}
+            </p>
+          </div>
+
+          {/* WhatsApp Message Template */}
+          <div className="space-y-1.5 pt-2 border-t border-amber-100">
+            <div className="flex items-center justify-between">
+              <label className="block text-xs font-bold text-stone-700 font-devanagari">
+                {isEn ? 'Default WhatsApp Message Template' : 'WhatsApp मेसेज मसुदा (टेंप्लेट)'}
+              </label>
+              <span className="text-[11px] text-stone-500 font-mono">
+                {isEn ? 'Variables: {donor_name}, {amount}, {receipt_no}, {date}, {mandal_name}, {year}' : 'व्हेरिएबल्स: {donor_name}, {amount}, {receipt_no}, {date}, {mandal_name}, {year}'}
+              </span>
+            </div>
+            <textarea
+              rows={6}
+              value={settings.defaultWhatsAppMessage || ''}
+              onChange={(e) =>
+                setSettings({ ...settings, defaultWhatsAppMessage: e.target.value })
+              }
+              placeholder={`॥ श्री गणेशाय नमः ॥\n\nसस्नेह नमस्कार {donor_name} जी,\n\n{mandal_name} तर्फे सन {year} च्या गणेशोत्सवासाठी आपली ₹{amount}/- ची देणगी / वर्गणी अधिकृतपणे जमा झाली आहे.\n\nपावती क्र: {receipt_no}\nदिनांक: {date}\n\nआपली डिजिटल पावती सोबत जोडली आहे. बाप्पाच्या कृपेने आपल्या सर्व मनोकामना पूर्ण होवोत हीच प्रार्थना!\n\n॥ गणपती बाप्पा मोरया ॥`}
+              className="w-full px-3.5 py-2.5 bg-white border border-stone-300 rounded-lg text-xs text-stone-900 font-devanagari focus:ring-2 focus:ring-orange-500 leading-relaxed"
+            />
+            <p className="text-[11px] text-stone-500 font-devanagari leading-relaxed">
+              {isEn
+                ? 'Use variables like {donor_name}, {amount}, {receipt_no}, {date}, {mandal_name}, {year} to auto-fill receipt details in the WhatsApp message.'
+                : 'मेसेजमध्ये {donor_name}, {amount}, {receipt_no}, {date}, {mandal_name}, {year} या शब्दांच्या जागी पावतीची माहिती आपोआप भरेल.'}
             </p>
           </div>
         </CardContent>

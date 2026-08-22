@@ -160,7 +160,32 @@ CREATE INDEX IF NOT EXISTS idx_announcements_status ON announcements(status);
 CREATE INDEX IF NOT EXISTS idx_announcements_active ON announcements(active);
 
 -- ------------------------------------------------------------------------------
--- 7. AUDIT LOGS TABLE
+-- 7. EXPENSES TABLE (निधी व खर्च व्यवस्थापन)
+-- ------------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS expenses (
+  id TEXT PRIMARY KEY,
+  expense_number TEXT,
+  numeric_expense_number INT,
+  date TEXT NOT NULL,
+  spent_for TEXT NOT NULL,
+  description TEXT DEFAULT '',
+  amount NUMERIC NOT NULL DEFAULT 0,
+  vendor_person TEXT DEFAULT '',
+  note TEXT DEFAULT '',
+  added_by TEXT NOT NULL,
+  added_by_id TEXT,
+  user_role TEXT,
+  mode TEXT NOT NULL CHECK (mode IN ('LIVE', 'TEST')),
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_expenses_mode ON expenses(mode);
+CREATE INDEX IF NOT EXISTS idx_expenses_date ON expenses(date);
+CREATE INDEX IF NOT EXISTS idx_expenses_created_at ON expenses(created_at DESC);
+
+-- ------------------------------------------------------------------------------
+-- 8. AUDIT LOGS TABLE
 -- ------------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS audit_logs (
   id TEXT PRIMARY KEY,
@@ -180,7 +205,7 @@ CREATE INDEX IF NOT EXISTS idx_audit_logs_mode ON audit_logs(mode);
 CREATE INDEX IF NOT EXISTS idx_audit_logs_timestamp ON audit_logs(timestamp DESC);
 
 -- ------------------------------------------------------------------------------
--- 8. RECEIPT COUNTERS TABLE (Atomic Sequential Numbering)
+-- 9. RECEIPT COUNTERS TABLE (Atomic Sequential Numbering)
 -- ------------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS receipt_counters (
   mode TEXT PRIMARY KEY CHECK (mode IN ('LIVE', 'TEST')),
@@ -194,7 +219,7 @@ VALUES ('LIVE', 0), ('TEST', 0)
 ON CONFLICT (mode) DO NOTHING;
 
 -- ------------------------------------------------------------------------------
--- 9. ATOMIC RECEIPT NUMBER GENERATOR FUNCTION
+-- 10. ATOMIC RECEIPT NUMBER GENERATOR FUNCTION
 -- ------------------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION get_next_receipt_number_atomic(p_mode TEXT)
 RETURNS JSONB AS $$
@@ -246,7 +271,7 @@ END;
 $$ LANGUAGE plpgsql;
 
 -- ------------------------------------------------------------------------------
--- 10. ROW LEVEL SECURITY (RLS) POLICIES
+-- 11. ROW LEVEL SECURITY (RLS) POLICIES
 -- ------------------------------------------------------------------------------
 -- Enable RLS on all tables
 ALTER TABLE mandal_settings ENABLE ROW LEVEL SECURITY;
@@ -255,6 +280,7 @@ ALTER TABLE donors ENABLE ROW LEVEL SECURITY;
 ALTER TABLE payments ENABLE ROW LEVEL SECURITY;
 ALTER TABLE pavtis ENABLE ROW LEVEL SECURITY;
 ALTER TABLE announcements ENABLE ROW LEVEL SECURITY;
+ALTER TABLE expenses ENABLE ROW LEVEL SECURITY;
 ALTER TABLE audit_logs ENABLE ROW LEVEL SECURITY;
 ALTER TABLE receipt_counters ENABLE ROW LEVEL SECURITY;
 
@@ -287,6 +313,9 @@ CREATE POLICY "Full access for service role on pavtis" ON pavtis
 CREATE POLICY "Full access for service role on announcements" ON announcements
   FOR ALL USING (true) WITH CHECK (true);
 
+CREATE POLICY "Full access for service role on expenses" ON expenses
+  FOR ALL USING (true) WITH CHECK (true);
+
 CREATE POLICY "Full access for service role on audit_logs" ON audit_logs
   FOR ALL USING (true) WITH CHECK (true);
 
@@ -314,7 +343,7 @@ VALUES (
   'Tapadia Nagar Akola 444001',
   '9876543210',
   '9123456789',
-  'https://chat.whatsapp.com/sample-ganesh-mandal-group',
+  'https://chat.whatsapp.com/EOO3qPs2WJXF3vcvHtmCaL',
   '२०२६',
   '॥ श्री गणेशाय नमः ॥',
   '॥ गणपती बाप्पा मोरया ॥',

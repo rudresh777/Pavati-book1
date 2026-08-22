@@ -63,7 +63,7 @@ async function runWhatsAppTests() {
   }
 
   // Update Settings test
-  const testGroupUrl = 'https://chat.whatsapp.com/GaneshMandalTest2026';
+  const testGroupUrl = 'https://chat.whatsapp.com/EOO3qPs2WJXF3vcvHtmCaL';
   await storage.saveSettings({
     ...settings,
     whatsappGroupLink: testGroupUrl,

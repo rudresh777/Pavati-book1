@@ -83,6 +83,13 @@ export async function POST(request: Request) {
 
     // 1. Ensure or link Donor record (prevents duplicate donors)
     let finalDonorId = donorId;
+    if (finalDonorId) {
+      const existingDonor = await storage.getDonorById(finalDonorId, mode as AppMode);
+      if (!existingDonor) {
+        finalDonorId = null;
+      }
+    }
+
     if (!finalDonorId) {
       // Check if donor with same mobile exists
       if (donorMobile?.trim()) {

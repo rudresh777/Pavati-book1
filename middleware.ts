@@ -13,6 +13,7 @@ export const config = {
     '/pending/:path*',
     '/donors/:path*',
     '/payments/:path*',
+    '/expenses/:path*',
     '/settings/:path*',
     '/audit-log/:path*',
     '/announcements/manage/:path*',

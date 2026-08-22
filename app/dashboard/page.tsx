@@ -13,6 +13,7 @@ import {
   ArrowRight,
   Share2,
   Eye,
+  Calendar,
 } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
@@ -23,12 +24,14 @@ import { Payment, Pavti, MandalSettings } from '@/types';
 import { formatIndianCurrency } from '@/lib/utils/number-to-words';
 import { PavtiShareModal } from '@/components/pavti/PavtiShareModal';
 import { PavtiCard } from '@/components/pavti/PavtiCard';
+import { cn } from '@/lib/utils/cn';
 
 export default function DashboardPage() {
-  const { mode, user } = useAppMode();
+  const { mode, user, setUser } = useAppMode();
   const { t } = useLanguage();
 
   const [summary, setSummary] = useState<any | null>(null);
+  const [expenseSummary, setExpenseSummary] = useState<any | null>(null);
   const [userRole, setUserRole] = useState<string>('HOST');
   const [recentPayments, setRecentPayments] = useState<Payment[]>([]);
   const [pendingPayments, setPendingPayments] = useState<Payment[]>([]);
@@ -42,18 +45,21 @@ export default function DashboardPage() {
   const fetchDashboardData = async () => {
     setIsLoading(true);
     try {
-      const [sumRes, setRes, meRes] = await Promise.all([
+      const [sumRes, setRes, meRes, expRes] = await Promise.all([
         fetch(`/api/dashboard/summary?mode=${mode}`),
         fetch(`/api/settings`),
         fetch('/api/auth/me'),
+        fetch(`/api/expenses/summary?mode=${mode}`),
       ]);
 
       const sumData = await sumRes.json();
       const setData = await setRes.json();
       const meData = await meRes.json();
+      const expData = await expRes.json();
 
       if (meData.user?.role) {
         setUserRole(meData.user.role);
+        setUser(meData.user);
       } else if (sumData.role) {
         setUserRole(sumData.role);
       }
@@ -62,6 +68,9 @@ export default function DashboardPage() {
         setSummary(sumData.summary);
         setRecentPayments(sumData.recentPayments || []);
         setPendingPayments(sumData.pendingPayments || []);
+      }
+      if (expData.summary) {
+        setExpenseSummary(expData.summary);
       }
       if (setData.settings) {
         setSettings(setData.settings);
@@ -128,6 +137,17 @@ export default function DashboardPage() {
             </Button>
           </Link>
 
+          <Link href="/expenses">
+            <Button
+              variant="outline"
+              size="md"
+              className="flex items-center gap-1.5 py-2.5 px-4 font-devanagari border-rose-300 bg-rose-50 hover:bg-rose-100 text-rose-950"
+            >
+              <Wallet className="w-4 h-4 text-rose-600" />
+              <span>{t('expenses.title') || 'निधी व खर्च'}</span>
+            </Button>
+          </Link>
+
           <Link href="/pavti/new?pending=true">
             <Button
               variant="outline"
@@ -143,8 +163,8 @@ export default function DashboardPage() {
 
       {/* KPI METRICS (ROLE-BASED CONDITIONAL RENDERING) */}
       {isSuperAdmin ? (
-        /* SUPER ADMIN VIEW: Show Total Collection, Cash, UPI, and Pending metrics */
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        /* SUPER ADMIN VIEW: Show Total Collection, Today's Collection, Funds & Expenses, Cash/UPI Breakdown, and Pending metrics */
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
           {/* Total Collection */}
           <Card className="border-l-4 border-l-orange-600 border-stone-200 shadow-sm">
             <CardContent className="p-5 space-y-2">
@@ -177,6 +197,37 @@ export default function DashboardPage() {
               <div className="text-xs text-stone-500 font-devanagari">
                 {t('dashboard.yesterdayCollection')}: {formatIndianCurrency(summary?.yesterdayCollection || 0)}
               </div>
+            </CardContent>
+          </Card>
+
+          {/* Funds & Expenses Card */}
+          <Card className="border-l-4 border-l-rose-500 border-stone-200 shadow-sm hover:border-rose-300 transition-colors">
+            <CardContent className="p-5 space-y-2 flex flex-col justify-between h-full">
+              <div>
+                <div className="flex items-center justify-between text-stone-500 text-xs font-bold uppercase font-devanagari">
+                  <span>{t('expenses.dashboardCardTitle') || 'निधी व खर्च'}</span>
+                  <Wallet className="w-4 h-4 text-rose-500" />
+                </div>
+                <div className="pt-1 space-y-1">
+                  <div className="flex justify-between items-baseline">
+                    <span className="text-[11px] text-stone-500 font-devanagari">{t('expenses.todayExpenses') || 'आजचा खर्च'}:</span>
+                    <span className="text-base font-black text-rose-700 font-mono">
+                      {isLoading ? '...' : formatIndianCurrency(expenseSummary?.todayExpense || 0)}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-baseline border-t border-stone-100 pt-1">
+                    <span className="text-[11px] text-stone-500 font-devanagari">{t('expenses.totalExpenses') || 'एकूण खर्च'}:</span>
+                    <span className="text-sm font-bold text-stone-900 font-mono">
+                      {isLoading ? '...' : formatIndianCurrency(expenseSummary?.totalExpense || 0)}
+                    </span>
+                  </div>
+                </div>
+              </div>
+              <Link href="/expenses" className="pt-1">
+                <Button variant="outline" size="sm" className="w-full font-devanagari text-[11px] font-bold border-rose-200 bg-rose-50/60 hover:bg-rose-100 text-rose-950 py-1">
+                  <span>{t('expenses.viewExpensesBtn') || 'खर्च व्यवस्थापन पहा →'}</span>
+                </Button>
+              </Link>
             </CardContent>
           </Card>
 
@@ -225,8 +276,55 @@ export default function DashboardPage() {
           </Card>
         </div>
       ) : (
-        /* HOST VIEW: Strictly NO Total Collection, Cash or UPI totals */
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        /* HOST VIEW: Show Today's Collection, Funds & Expenses, Pending Amount, and New Pavti */
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          {/* Today's Collection */}
+          <Card className="border-l-4 border-l-emerald-600 border-stone-200 shadow-sm">
+            <CardContent className="p-5 space-y-2">
+              <div className="flex items-center justify-between text-stone-500 text-xs font-bold uppercase font-devanagari">
+                <span>{t('dashboard.todayCollection')}</span>
+                <TrendingUp className="w-4 h-4 text-emerald-600" />
+              </div>
+              <div className="text-2xl sm:text-3xl font-black text-emerald-700 font-mono tracking-tight">
+                {isLoading ? '...' : formatIndianCurrency(summary?.todayCollection || 0)}
+              </div>
+              <div className="text-xs text-stone-500 font-devanagari">
+                {t('dashboard.yesterdayCollection')}: {formatIndianCurrency(summary?.yesterdayCollection || 0)}
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Funds & Expenses Card */}
+          <Card className="border-l-4 border-l-rose-500 border-stone-200 shadow-sm hover:border-rose-300 transition-colors">
+            <CardContent className="p-5 space-y-2 flex flex-col justify-between h-full">
+              <div>
+                <div className="flex items-center justify-between text-stone-500 text-xs font-bold uppercase font-devanagari">
+                  <span>{t('expenses.dashboardCardTitle') || 'निधी व खर्च'}</span>
+                  <Wallet className="w-4 h-4 text-rose-500" />
+                </div>
+                <div className="pt-1 space-y-1">
+                  <div className="flex justify-between items-baseline">
+                    <span className="text-[11px] text-stone-500 font-devanagari">{t('expenses.todayExpenses') || 'आजचा खर्च'}:</span>
+                    <span className="text-base font-black text-rose-700 font-mono">
+                      {isLoading ? '...' : formatIndianCurrency(expenseSummary?.todayExpense || 0)}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-baseline border-t border-stone-100 pt-1">
+                    <span className="text-[11px] text-stone-500 font-devanagari">{t('expenses.totalExpenses') || 'एकूण खर्च'}:</span>
+                    <span className="text-sm font-bold text-stone-900 font-mono">
+                      {isLoading ? '...' : formatIndianCurrency(expenseSummary?.totalExpense || 0)}
+                    </span>
+                  </div>
+                </div>
+              </div>
+              <Link href="/expenses" className="pt-1">
+                <Button variant="outline" size="sm" className="w-full font-devanagari text-[11px] font-bold border-rose-200 bg-rose-50/60 hover:bg-rose-100 text-rose-950 py-1">
+                  <span>{t('expenses.viewExpensesBtn') || 'खर्च व्यवस्थापन पहा →'}</span>
+                </Button>
+              </Link>
+            </CardContent>
+          </Card>
+
           {/* Operational Pending Amount */}
           <Card className="border-l-4 border-l-amber-500 border-stone-200 shadow-sm">
             <CardContent className="p-5 space-y-2">
@@ -266,28 +364,93 @@ export default function DashboardPage() {
               </Link>
             </CardContent>
           </Card>
-
-          {/* Quick Action: Donors Directory */}
-          <Card className="border-l-4 border-l-emerald-600 border-stone-200 shadow-sm hover:border-emerald-300 transition-colors">
-            <CardContent className="p-5 space-y-2 flex flex-col justify-between">
-              <div>
-                <div className="flex items-center justify-between text-stone-500 text-xs font-bold uppercase font-devanagari">
-                  <span>{t('nav.donors')}</span>
-                  <Users className="w-4 h-4 text-emerald-600" />
-                </div>
-                <div className="text-sm font-semibold text-stone-700 pt-1 font-devanagari">
-                  {t('donors.subtitle')}
-                </div>
-              </div>
-              <Link href="/donors" className="pt-2">
-                <Button variant="outline" size="sm" className="w-full font-devanagari">
-                  {t('donors.title')} →
-                </Button>
-              </Link>
-            </CardContent>
-          </Card>
         </div>
       )}
+
+      {/* COLLECTION HISTORY BY DATE (AUTHORIZED USERS & HOSTS) */}
+      <div className="space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 border-b border-stone-200 pb-3">
+          <div>
+            <h2 className="text-lg font-bold font-devanagari text-stone-900 flex items-center gap-2">
+              <Calendar className="w-5 h-5 text-orange-600" />
+              <span>{t('dashboard.collectionHistory')}</span>
+            </h2>
+            <p className="text-xs text-stone-500 font-devanagari">
+              {t('dashboard.collectionHistorySubtitle')}
+            </p>
+          </div>
+          <div className="text-xs font-bold text-stone-600 bg-stone-100 px-3 py-1.5 rounded-lg font-devanagari self-start sm:self-auto">
+            {summary?.dailyHistory?.length || 0} दिवसांची नोंद
+          </div>
+        </div>
+
+        {(!summary?.dailyHistory || summary.dailyHistory.length === 0) ? (
+          <Card className="border-dashed border-stone-300">
+            <CardContent className="p-8 text-center space-y-2 font-devanagari text-stone-500">
+              <Calendar className="w-8 h-8 text-stone-300 mx-auto opacity-70" />
+              <div className="font-bold text-stone-700 text-sm">
+                {t('dashboard.noHistoryYet')}
+              </div>
+              <p className="text-xs">
+                जमा झालेल्या प्रत्यक्ष पावत्यांनुसार तारखेनुसार दैनिक जमा आपोआप येथे दिसेल.
+              </p>
+            </CardContent>
+          </Card>
+        ) : (
+          <div className="bg-white rounded-xl border border-stone-200 overflow-hidden shadow-sm">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs text-stone-700">
+                <thead className="bg-gradient-to-r from-amber-50 to-orange-50 text-stone-800 font-bold border-b border-amber-200 uppercase font-devanagari">
+                  <tr>
+                    <th className="px-4 py-3.5">दिनांक (Date)</th>
+                    <th className="px-4 py-3.5 text-right">{t('dashboard.cashCollection')}</th>
+                    <th className="px-4 py-3.5 text-right">{t('dashboard.upiCollection')}</th>
+                    <th className="px-4 py-3.5 text-right">{t('dashboard.dailyTotal')}</th>
+                    <th className="px-4 py-3.5 text-center">{t('dashboard.receiptsCount')}</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-stone-100">
+                  {summary.dailyHistory.map((record: any) => {
+                    const isToday = record.date === new Date().toISOString().split('T')[0];
+                    return (
+                      <tr
+                        key={record.date}
+                        className={cn(
+                          'hover:bg-amber-50/40 transition-colors',
+                          isToday && 'bg-amber-50/60 font-semibold'
+                        )}
+                      >
+                        <td className="px-4 py-3 font-mono text-stone-900 flex items-center gap-2">
+                          <span className="font-bold">{record.formattedDate || record.date}</span>
+                          {isToday && (
+                            <span className="bg-emerald-100 text-emerald-800 text-[10px] font-extrabold px-2 py-0.5 rounded-full font-devanagari">
+                              {t('dashboard.todayBadge')}
+                            </span>
+                          )}
+                        </td>
+                        <td className="px-4 py-3 text-right font-mono text-stone-800">
+                          {formatIndianCurrency(record.cashCollection || 0)}
+                        </td>
+                        <td className="px-4 py-3 text-right font-mono text-blue-700 font-bold">
+                          {formatIndianCurrency(record.upiCollection || 0)}
+                        </td>
+                        <td className="px-4 py-3 text-right font-mono text-emerald-800 font-extrabold text-sm">
+                          {formatIndianCurrency(record.totalCollection || 0)}
+                        </td>
+                        <td className="px-4 py-3 text-center font-devanagari text-stone-600">
+                          <span className="bg-stone-100 px-2.5 py-0.5 rounded-md font-mono font-bold">
+                            {record.receiptCount}
+                          </span>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+      </div>
 
       {/* TWO COLUMN SECTION: RECENT PAVTIS & PENDING DONORS */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">

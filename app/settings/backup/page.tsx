@@ -113,8 +113,9 @@ export default function BackupSettingsPage() {
   // Handle Full Live Data Reset
   const handleResetSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (resetConfirmationInput !== 'RESET' && resetConfirmationInput !== 'DELETE ALL DATA') {
-      setResetError(isEn ? 'Please type exact phrase: RESET' : 'कृपया अचूक शब्द टाईप करा: RESET');
+    const cleanInput = resetConfirmationInput.trim().toUpperCase();
+    if (cleanInput !== 'RESET' && cleanInput !== 'DELETE ALL DATA') {
+      setResetError(isEn ? 'Please type: RESET' : 'कृपया अचूक शब्द टाईप करा: RESET');
       return;
     }
 
@@ -130,7 +131,7 @@ export default function BackupSettingsPage() {
       const res = await fetch('/api/data/reset', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ confirmation: 'RESET', mode: 'LIVE' }),
+        body: JSON.stringify({ confirmation: cleanInput, mode: 'LIVE' }),
       });
 
       const data = await res.json();
@@ -426,7 +427,7 @@ export default function BackupSettingsPage() {
                   type="submit"
                   variant="danger"
                   size="sm"
-                  disabled={resetConfirmationInput !== 'RESET' && resetConfirmationInput !== 'DELETE ALL DATA'}
+                  disabled={resetConfirmationInput.trim().toUpperCase() !== 'RESET' && resetConfirmationInput.trim().toUpperCase() !== 'DELETE ALL DATA'}
                   className="font-devanagari font-bold"
                 >
                   {isEn ? 'Proceed to Final Step →' : 'पुढे जा →'}

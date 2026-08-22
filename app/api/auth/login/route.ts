@@ -14,10 +14,11 @@ export async function POST(request: Request) {
       );
     }
 
+    const cleanEmail = email.trim().toLowerCase();
     const storage = getStorageProvider();
     await storage.init();
 
-    const user = await storage.getUserByEmail(email);
+    const user = await storage.getUserByEmail(cleanEmail);
 
     if (!user || !user.active) {
       return NextResponse.json(
@@ -27,16 +28,41 @@ export async function POST(request: Request) {
     }
 
     let isMatch = false;
-    try {
-      isMatch = await bcrypt.compare(password, user.passwordHash);
-    } catch {
-      isMatch = false;
+
+    // 1. Try Supabase Auth verification if configured
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+    if (supabaseUrl && supabaseAnonKey) {
+      try {
+        const { createClient } = await import('@supabase/supabase-js');
+        const authClient = createClient(supabaseUrl, supabaseAnonKey, {
+          auth: { persistSession: false, autoRefreshToken: false },
+        });
+        const { data: authData, error: authErr } = await authClient.auth.signInWithPassword({
+          email: cleanEmail,
+          password: password.trim(),
+        });
+        if (!authErr && authData?.user) {
+          isMatch = true;
+        }
+      } catch (authErr) {
+        console.warn('[Supabase Auth Login] fallback to hash check:', authErr);
+      }
     }
 
-    // Fallback for default demo accounts
-    if (!isMatch) {
-      if (email === 'admin@mandal.org' && password === 'admin123') isMatch = true;
-      if (email === 'host@mandal.org' && password === 'host123') isMatch = true;
+    // 2. Hash verification fallback
+    if (!isMatch && user.passwordHash) {
+      try {
+        isMatch = await bcrypt.compare(password.trim(), user.passwordHash);
+      } catch {
+        isMatch = false;
+      }
+    }
+
+    // 3. Fallback for initial demo accounts only if not yet reset
+    if (!isMatch && !user.passwordHash) {
+      if (cleanEmail === 'admin@mandal.org' && password === 'admin123') isMatch = true;
+      if (cleanEmail === 'host@mandal.org' && password === 'host123') isMatch = true;
     }
 
     if (!isMatch) {

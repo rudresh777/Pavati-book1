@@ -1,7 +1,8 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { Users, Plus, Trash2, Shield, UserCheck, Key, Phone, Mail } from 'lucide-react';
+import { Users, Plus, Trash2, Shield, UserCheck, Key, KeyRound, Phone, Mail } from 'lucide-react';
+import Link from 'next/link';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Modal } from '@/components/ui/Modal';
@@ -117,15 +118,28 @@ export default function UsersManagementPage() {
           </p>
         </div>
 
-        <Button
-          variant="primary"
-          size="sm"
-          onClick={handleOpenAddModal}
-          className="font-devanagari flex items-center gap-1.5 shadow"
-        >
-          <Plus className="w-4 h-4" />
-          <span>{isEn ? '+ Add New Host' : '+ नवीन प्रतिनिधी जोडा'}</span>
-        </Button>
+        <div className="flex flex-wrap items-center gap-2.5">
+          <Link href="/settings/passwords">
+            <Button
+              variant="outline"
+              size="sm"
+              className="font-devanagari flex items-center gap-1.5 border-amber-300 bg-amber-50 hover:bg-amber-100 text-amber-950"
+            >
+              <KeyRound className="w-4 h-4 text-orange-600" />
+              <span>{isEn ? 'Password Management' : 'पासवर्ड व्यवस्थापन'}</span>
+            </Button>
+          </Link>
+
+          <Button
+            variant="primary"
+            size="sm"
+            onClick={handleOpenAddModal}
+            className="font-devanagari flex items-center gap-1.5 shadow"
+          >
+            <Plus className="w-4 h-4" />
+            <span>{isEn ? '+ Add New Host' : '+ नवीन प्रतिनिधी जोडा'}</span>
+          </Button>
+        </div>
       </div>
 
       {/* Users List Table */}

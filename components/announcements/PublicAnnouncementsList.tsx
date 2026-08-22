@@ -3,7 +3,6 @@
 import React from 'react';
 import { Bell, Calendar, MapPin, Clock } from 'lucide-react';
 import { Announcement, MandalSettings } from '@/types';
-import { useLanguage } from '@/lib/context/language-context';
 import { Card, CardContent } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 
@@ -16,21 +15,17 @@ export function PublicAnnouncementsList({
   announcements,
   settings,
 }: PublicAnnouncementsListProps) {
-  const { language, t } = useLanguage();
-
   return (
     <div className="max-w-4xl mx-auto space-y-6">
-      {/* Page Header */}
+      {/* Page Header (Strictly Marathi Header) */}
       <div className="border-b border-stone-200 pb-4">
         <div className="flex items-center gap-2.5">
-          <div className="p-2.5 bg-orange-100 text-orange-700 rounded-xl">
+          <div className="p-2.5 bg-orange-100 text-orange-700 rounded-xl shadow-sm">
             <Bell className="w-6 h-6" />
           </div>
           <div>
             <h1 className="text-2xl sm:text-3xl font-extrabold font-devanagari text-stone-900">
-              {language === 'mr'
-                ? 'मंडळ अधिकृत सूचना फलक'
-                : 'Official Mandal Notice Board'}
+              मंडळ अधिकृत सूचना फलक
             </h1>
             <p className="text-xs sm:text-sm text-stone-500 font-devanagari">
               {settings?.mandalNameMarathi || 'मोरया गणेशोत्सव मंडळ'} (
@@ -45,14 +40,10 @@ export function PublicAnnouncementsList({
         <div className="text-center py-16 bg-white rounded-2xl border border-stone-200">
           <Bell className="w-12 h-12 text-stone-300 mx-auto mb-3" />
           <h3 className="text-base font-bold text-stone-700 font-devanagari">
-            {language === 'mr'
-              ? 'सध्या कोणतीही नवीन सूचना उपलब्ध नाही'
-              : 'No announcements published at the moment.'}
+            सध्या कोणतीही नवीन सूचना उपलब्ध नाही
           </h3>
           <p className="text-xs text-stone-500 mt-1 font-devanagari">
-            {language === 'mr'
-              ? 'नवीन सूचना प्रसिद्ध झाल्यावर येथे दिसतील.'
-              : 'Newly published announcements will appear here.'}
+            नवीन सूचना प्रसिद्ध झाल्यावर येथे दिसतील.
           </p>
         </div>
       ) : (
@@ -60,14 +51,8 @@ export function PublicAnnouncementsList({
           {announcements.map((item) => {
             const isHighPriority =
               item.priority === 'HIGH' || item.priority === 'URGENT';
-            const title =
-              language === 'en' && item.titleEnglish
-                ? item.titleEnglish
-                : item.titleMarathi;
-            const content =
-              language === 'en' && item.contentEnglish
-                ? item.contentEnglish
-                : item.contentMarathi;
+            const title = item.titleMarathi || item.titleOriginal || item.titleEnglish;
+            const content = item.contentMarathi || item.contentOriginal || item.contentEnglish;
 
             return (
               <Card
@@ -79,11 +64,11 @@ export function PublicAnnouncementsList({
                     <div className="flex items-center gap-2">
                       {isHighPriority ? (
                         <Badge variant="danger">
-                          {language === 'mr' ? 'महत्त्वाची सूचना' : 'Important Notice'}
+                          महत्त्वाची सूचना
                         </Badge>
                       ) : (
                         <Badge variant="gold">
-                          {language === 'mr' ? 'सूचना' : 'Notice'}
+                          सूचना
                         </Badge>
                       )}
                       <span className="text-xs text-stone-500 flex items-center gap-1 font-medium font-mono">
@@ -110,9 +95,7 @@ export function PublicAnnouncementsList({
                   {item.venue && (
                     <div className="pt-2 text-xs font-semibold text-amber-900 flex items-center gap-1.5 bg-amber-50 p-2.5 rounded-lg border border-amber-200/80 font-devanagari">
                       <MapPin className="w-4 h-4 text-orange-600 flex-shrink-0" />
-                      <span>
-                        {language === 'mr' ? 'स्थान / पत्ता:' : 'Venue:'} {item.venue}
-                      </span>
+                      <span>स्थान / पत्ता: {item.venue}</span>
                     </div>
                   )}
                 </CardContent>

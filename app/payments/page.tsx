@@ -11,16 +11,18 @@ import {
   Trash2,
   AlertTriangle,
   PlusCircle,
+  Calendar,
 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { Modal } from '@/components/ui/Modal';
 import { useAppMode } from '@/lib/context/mode-context';
 import { useLanguage } from '@/lib/context/language-context';
-import { Payment, Pavti, MandalSettings } from '@/types';
+import { Payment, Pavti, MandalSettings, DailyCollectionRecord } from '@/types';
 import { formatIndianCurrency } from '@/lib/utils/number-to-words';
 import { PavtiCard } from '@/components/pavti/PavtiCard';
 import { PavtiShareModal } from '@/components/pavti/PavtiShareModal';
+import { cn } from '@/lib/utils/cn';
 
 export default function PaymentsLedgerPage() {
   const { mode } = useAppMode();
@@ -28,6 +30,8 @@ export default function PaymentsLedgerPage() {
   const isEn = language === 'en';
 
   const [payments, setPayments] = useState<Payment[]>([]);
+  const [dailyHistory, setDailyHistory] = useState<DailyCollectionRecord[]>([]);
+  const [activeTab, setActiveTab] = useState<'RECORDS' | 'HISTORY'>('RECORDS');
   const [settings, setSettings] = useState<MandalSettings | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('ALL');
@@ -45,15 +49,18 @@ export default function PaymentsLedgerPage() {
   const fetchPayments = async () => {
     setIsLoading(true);
     try {
-      const [payRes, setRes] = await Promise.all([
+      const [payRes, setRes, dailyRes] = await Promise.all([
         fetch(`/api/payments?mode=${mode}`),
         fetch('/api/settings'),
+        fetch(`/api/collections/daily?mode=${mode}`),
       ]);
       const payData = await payRes.json();
       const setData = await setRes.json();
+      const dailyData = await dailyRes.json();
 
       if (payData.payments) setPayments(payData.payments);
       if (setData.settings) setSettings(setData.settings);
+      if (dailyData.dailyHistory) setDailyHistory(dailyData.dailyHistory);
     } catch (err) {
       console.error('Failed to fetch payments:', err);
     } finally {
@@ -202,70 +209,183 @@ export default function PaymentsLedgerPage() {
         </div>
       </div>
 
-      {/* Filter Controls Bar */}
-      <div className="bg-white p-4 rounded-xl border border-stone-200 shadow-sm space-y-3">
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-          {/* Search */}
-          <div className="relative">
-            <Search className="w-4 h-4 text-stone-400 absolute left-3 top-1/2 -translate-y-1/2" />
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder={t('ledger.searchPlaceholder')}
-              className="w-full pl-9 pr-3 py-2 bg-stone-50 border border-stone-300 rounded-lg text-xs text-stone-900 font-devanagari focus:outline-none focus:ring-2 focus:ring-orange-500"
-            />
-          </div>
+      {/* View Switcher Tabs */}
+      <div className="flex items-center gap-2 border-b border-stone-200 pb-2">
+        <button
+          onClick={() => setActiveTab('RECORDS')}
+          className={cn(
+            'px-4 py-2 rounded-xl text-xs font-bold font-devanagari transition-all flex items-center gap-2',
+            activeTab === 'RECORDS'
+              ? 'bg-orange-600 text-white shadow'
+              : 'bg-stone-100 text-stone-700 hover:bg-stone-200'
+          )}
+        >
+          <CreditCard className="w-4 h-4" />
+          <span>{isEn ? 'All Receipts / Records' : 'सर्व जमा नोंदी'}</span>
+        </button>
 
-          {/* Status Filter */}
-          <div>
-            <select
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-              className="w-full px-3 py-2 bg-stone-50 border border-stone-300 rounded-lg text-xs text-stone-800 font-devanagari focus:outline-none focus:ring-2 focus:ring-orange-500"
-            >
-              <option value="ALL">{t('ledger.allStatus')}</option>
-              <option value="PAID">{t('ledger.paidOnly')}</option>
-              <option value="DUE">{isEn ? 'Due Only' : 'फक्त बाकी'}</option>
-              <option value="PENDING">{t('ledger.pendingOnly')}</option>
-              <option value="CANCELLED">{t('ledger.cancelledOnly')}</option>
-            </select>
-          </div>
-
-          {/* Method Filter (Strictly Cash and UPI) */}
-          <div>
-            <select
-              value={methodFilter}
-              onChange={(e) => setMethodFilter(e.target.value)}
-              className="w-full px-3 py-2 bg-stone-50 border border-stone-300 rounded-lg text-xs text-stone-800 font-devanagari focus:outline-none focus:ring-2 focus:ring-orange-500"
-            >
-              <option value="ALL">{t('ledger.allMethods')}</option>
-              <option value="CASH">{isEn ? 'Cash Only' : 'फक्त रोख'}</option>
-              <option value="UPI">{isEn ? 'UPI Only' : 'फक्त यूपीआय'}</option>
-              <option value="DUE">{isEn ? 'Due Only' : 'फक्त बाकी'}</option>
-            </select>
-          </div>
-        </div>
-
-        {/* Quick Summary Strip */}
-        <div className="flex flex-wrap items-center justify-between text-xs text-stone-600 pt-2 border-t border-stone-100 font-devanagari">
-          <span>
-            {t('ledger.totalRecords')} <strong>{filteredPayments.length}</strong>
-          </span>
-          <span>
-            {t('ledger.filteredTotal')} <strong className="text-orange-800 font-mono">{formatIndianCurrency(totalPaidFiltered)}</strong>
-          </span>
-        </div>
+        <button
+          onClick={() => setActiveTab('HISTORY')}
+          className={cn(
+            'px-4 py-2 rounded-xl text-xs font-bold font-devanagari transition-all flex items-center gap-2',
+            activeTab === 'HISTORY'
+              ? 'bg-orange-600 text-white shadow'
+              : 'bg-stone-100 text-stone-700 hover:bg-stone-200'
+          )}
+        >
+          <Calendar className="w-4 h-4" />
+          <span>{isEn ? 'Daily Collection History' : 'दैनिक जमा इतिहास'}</span>
+          {dailyHistory.length > 0 && (
+            <span className={cn('px-2 py-0.5 rounded-full text-[10px] font-mono', activeTab === 'HISTORY' ? 'bg-orange-700 text-white' : 'bg-stone-200 text-stone-800')}>
+              {dailyHistory.length}
+            </span>
+          )}
+        </button>
       </div>
 
-      {/* Ledger Table */}
-      <div className="bg-white rounded-xl border border-stone-200 overflow-hidden shadow-sm">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs text-stone-700 min-w-[760px]">
-            <thead className="bg-stone-50 text-stone-600 font-bold border-b border-stone-200 uppercase font-devanagari">
-              <tr>
-                <th className="px-4 py-3">{isEn ? 'Receipt #' : 'पावती क्र.'}</th>
-                <th className="px-4 py-3">{isEn ? 'Date' : 'दिनांक'}</th>
+      {activeTab === 'HISTORY' ? (
+        /* DAILY COLLECTION HISTORY VIEW */
+        <div className="space-y-4">
+          <div className="bg-white rounded-xl border border-stone-200 overflow-hidden shadow-sm">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs text-stone-700">
+                <thead className="bg-gradient-to-r from-amber-50 to-orange-50 text-stone-800 font-bold border-b border-amber-200 uppercase font-devanagari">
+                  <tr>
+                    <th className="px-4 py-3.5">{isEn ? 'Date' : 'दिनांक'}</th>
+                    <th className="px-4 py-3.5 text-right">{isEn ? 'Cash Collection' : 'रोख जमा'}</th>
+                    <th className="px-4 py-3.5 text-right">{isEn ? 'UPI Collection' : 'यूपीआय जमा'}</th>
+                    <th className="px-4 py-3.5 text-right">{isEn ? 'Total Daily Collection' : 'एकूण दैनिक जमा'}</th>
+                    <th className="px-4 py-3.5 text-center">{isEn ? 'Receipts Count' : 'पावत्या'}</th>
+                    <th className="px-4 py-3.5 text-right">{isEn ? 'Action' : 'कृती'}</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-stone-100">
+                  {dailyHistory.length === 0 ? (
+                    <tr>
+                      <td colSpan={6} className="text-center py-12 text-stone-400 font-devanagari">
+                        {isEn ? 'No collection history recorded.' : 'कोणताही जमा इतिहास उपलब्ध नाही.'}
+                      </td>
+                    </tr>
+                  ) : (
+                    dailyHistory.map((record) => {
+                      const isToday = record.date === new Date().toISOString().split('T')[0];
+                      return (
+                        <tr
+                          key={record.date}
+                          className={cn(
+                            'hover:bg-amber-50/40 transition-colors',
+                            isToday && 'bg-amber-50/60 font-semibold'
+                          )}
+                        >
+                          <td className="px-4 py-3 font-mono text-stone-900 flex items-center gap-2">
+                            <span className="font-bold">{record.formattedDate || record.date}</span>
+                            {isToday && (
+                              <span className="bg-emerald-100 text-emerald-800 text-[10px] font-extrabold px-2 py-0.5 rounded-full font-devanagari">
+                                {isEn ? 'Today' : 'आज'}
+                              </span>
+                            )}
+                          </td>
+                          <td className="px-4 py-3 text-right font-mono text-stone-800">
+                            {formatIndianCurrency(record.cashCollection || 0)}
+                          </td>
+                          <td className="px-4 py-3 text-right font-mono text-blue-700 font-bold">
+                            {formatIndianCurrency(record.upiCollection || 0)}
+                          </td>
+                          <td className="px-4 py-3 text-right font-mono text-emerald-800 font-extrabold text-sm">
+                            {formatIndianCurrency(record.totalCollection || 0)}
+                          </td>
+                          <td className="px-4 py-3 text-center font-devanagari text-stone-600">
+                            <span className="bg-stone-100 px-2.5 py-0.5 rounded-md font-mono font-bold">
+                              {record.receiptCount}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 text-right">
+                            <button
+                              onClick={() => {
+                                setSearchQuery(record.date);
+                                setActiveTab('RECORDS');
+                              }}
+                              className="text-xs text-orange-600 hover:text-orange-800 font-bold font-devanagari"
+                            >
+                              {isEn ? 'View Receipts →' : 'या नोंदी पहा →'}
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      ) : (
+        /* ALL RECORDS VIEW */
+        <>
+          {/* Filter Controls Bar */}
+          <div className="bg-white p-4 rounded-xl border border-stone-200 shadow-sm space-y-3">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              {/* Search */}
+              <div className="relative">
+                <Search className="w-4 h-4 text-stone-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder={t('ledger.searchPlaceholder')}
+                  className="w-full pl-9 pr-3 py-2 bg-stone-50 border border-stone-300 rounded-lg text-xs text-stone-900 font-devanagari focus:outline-none focus:ring-2 focus:ring-orange-500"
+                />
+              </div>
+
+              {/* Status Filter */}
+              <div>
+                <select
+                  value={statusFilter}
+                  onChange={(e) => setStatusFilter(e.target.value)}
+                  className="w-full px-3 py-2 bg-stone-50 border border-stone-300 rounded-lg text-xs text-stone-800 font-devanagari focus:outline-none focus:ring-2 focus:ring-orange-500"
+                >
+                  <option value="ALL">{t('ledger.allStatus')}</option>
+                  <option value="PAID">{t('ledger.paidOnly')}</option>
+                  <option value="DUE">{isEn ? 'Due Only' : 'फक्त बाकी'}</option>
+                  <option value="PENDING">{t('ledger.pendingOnly')}</option>
+                  <option value="CANCELLED">{t('ledger.cancelledOnly')}</option>
+                </select>
+              </div>
+
+              {/* Method Filter (Strictly Cash and UPI) */}
+              <div>
+                <select
+                  value={methodFilter}
+                  onChange={(e) => setMethodFilter(e.target.value)}
+                  className="w-full px-3 py-2 bg-stone-50 border border-stone-300 rounded-lg text-xs text-stone-800 font-devanagari focus:outline-none focus:ring-2 focus:ring-orange-500"
+                >
+                  <option value="ALL">{t('ledger.allMethods')}</option>
+                  <option value="CASH">{isEn ? 'Cash Only' : 'फक्त रोख'}</option>
+                  <option value="UPI">{isEn ? 'UPI Only' : 'फक्त यूपीआय'}</option>
+                  <option value="DUE">{isEn ? 'Due Only' : 'फक्त बाकी'}</option>
+                </select>
+              </div>
+            </div>
+
+            {/* Quick Summary Strip */}
+            <div className="flex flex-wrap items-center justify-between text-xs text-stone-600 pt-2 border-t border-stone-100 font-devanagari">
+              <span>
+                {t('ledger.totalRecords')} <strong>{filteredPayments.length}</strong>
+              </span>
+              <span>
+                {t('ledger.filteredTotal')} <strong className="text-orange-800 font-mono">{formatIndianCurrency(totalPaidFiltered)}</strong>
+              </span>
+            </div>
+          </div>
+
+          {/* Ledger Table */}
+          <div className="bg-white rounded-xl border border-stone-200 overflow-hidden shadow-sm">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs text-stone-700 min-w-[760px]">
+                <thead className="bg-stone-50 text-stone-600 font-bold border-b border-stone-200 uppercase font-devanagari">
+                  <tr>
+                    <th className="px-4 py-3">{isEn ? 'Receipt #' : 'पावती क्र.'}</th>
+                    <th className="px-4 py-3">{isEn ? 'Date' : 'दिनांक'}</th>
                 <th className="px-4 py-3">{isEn ? 'Donor Name' : 'देणगीदाराचे नाव'}</th>
                 <th className="px-4 py-3">{isEn ? 'Amount' : 'रक्कम'}</th>
                 <th className="px-4 py-3">{isEn ? 'Status' : 'स्थिती'}</th>
@@ -388,6 +508,8 @@ export default function PaymentsLedgerPage() {
           </table>
         </div>
       </div>
+      </>
+      )}
 
       {/* INDIVIDUAL RECORD DELETE CONFIRMATION MODAL */}
       {deletePaymentTarget && (

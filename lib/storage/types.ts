@@ -6,6 +6,8 @@ import {
   Pavti,
   Announcement,
   AuditLog,
+  Expense,
+  ExpenseSummary,
   AppMode,
   CollectionSummary,
   UserRole,
@@ -21,12 +23,14 @@ export interface DatabaseBackup {
     donors: Donor[];
     payments: Payment[];
     pavtis: Pavti[];
+    expenses?: Expense[];
     auditLogs: AuditLog[];
   };
   testData: {
     donors: Donor[];
     payments: Payment[];
     pavtis: Pavti[];
+    expenses?: Expense[];
     auditLogs: AuditLog[];
   };
 }
@@ -46,6 +50,11 @@ export interface IStorageProvider {
   getUserById(id: string): Promise<User | null>;
   getUserByEmail(email: string): Promise<User | null>;
   saveUser(user: User): Promise<User>;
+  updateUserPassword(
+    userId: string,
+    newPassword: string,
+    performedBy: { userId: string; userName: string; userRole: UserRole }
+  ): Promise<boolean>;
   deleteUser(id: string): Promise<boolean>;
 
   // Donors
@@ -102,6 +111,30 @@ export interface IStorageProvider {
   getPavtiByPaymentId(paymentId: string, mode: AppMode): Promise<Pavti | null>;
   savePavti(pavti: Pavti, mode: AppMode): Promise<Pavti>;
 
+  // Expenses (निधी व खर्च व्यवस्थापन)
+  getExpenses(mode: AppMode, filterDate?: string): Promise<Expense[]>;
+  getExpenseById(id: string, mode: AppMode): Promise<Expense | null>;
+  saveExpense(expense: Expense, mode: AppMode): Promise<Expense>;
+  updateExpense(
+    id: string,
+    data: {
+      date?: string;
+      spentFor?: string;
+      description?: string;
+      amount?: number;
+      vendorPerson?: string;
+      note?: string;
+    },
+    mode: AppMode,
+    user?: { userId: string; userName: string; userRole: UserRole }
+  ): Promise<Expense>;
+  deleteExpense(
+    id: string,
+    mode: AppMode,
+    user?: { userId: string; userName: string; userRole: UserRole }
+  ): Promise<{ success: boolean; deletedExpense: Expense }>;
+  getExpenseSummary(mode: AppMode, targetDate?: string): Promise<ExpenseSummary>;
+
   // Announcements
   getAnnouncements(onlyActive?: boolean): Promise<Announcement[]>;
   getAnnouncementById(id: string): Promise<Announcement | null>;
@@ -116,10 +149,11 @@ export interface IStorageProvider {
   getCollectionSummary(mode: AppMode): Promise<CollectionSummary>;
 
   // Data Reset & Test Operations
-  clearTestData(): Promise<{ deletedPayments: number; deletedDonors: number; deletedPavtis: number }>;
+  clearTestData(): Promise<{ deletedPayments: number; deletedDonors: number; deletedPavtis: number; deletedExpenses?: number }>;
   resetAllData(confirmation: string, mode: AppMode, user: { userId: string; userName: string; userRole: UserRole }): Promise<boolean>;
 
   // Backup & Restore
   exportBackup(): Promise<DatabaseBackup>;
   importBackup(backupData: DatabaseBackup): Promise<boolean>;
 }
+
