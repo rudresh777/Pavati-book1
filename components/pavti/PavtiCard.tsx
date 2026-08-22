@@ -25,6 +25,7 @@ import {
   TempleSilhouette,
   OfficialStamp,
 } from './PavtiOrnaments';
+import { GANPATI_IMAGE_DATA_URI } from '@/lib/assets/ganpati-image';
 
 interface PavtiCardProps {
   pavti: Pavti;
@@ -237,13 +238,12 @@ export function PavtiCard({
                 {/* Exact Ganpati Idol Artwork (Fully Visible, High-Resolution, Perfectly Framed) */}
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
-                  src="/images/ganpati.jpg"
+                  src={GANPATI_IMAGE_DATA_URI}
                   alt="श्री गणपती बाप्पा"
                   className="w-full h-full object-cover object-[center_12%] transition-transform duration-300"
                   style={{
                     filter: 'contrast(1.05) saturate(1.08)',
                   }}
-                  crossOrigin="anonymous"
                 />
 
                 {/* Subtle soft edge gradient transitions */}

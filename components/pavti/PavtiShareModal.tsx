@@ -163,14 +163,19 @@ export function PavtiShareModal({
     return result;
   };
 
-  // Helper to trigger browser image file download
-  const triggerDownload = (dataUrl: string, fileName: string) => {
+  // Helper to trigger browser image file download into phone gallery/downloads
+  const triggerDownload = (blob: Blob, fileName: string) => {
+    const blobUrl = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.download = fileName;
-    link.href = dataUrl;
+    link.href = blobUrl;
+    link.dataset.downloadurl = ['image/png', fileName, blobUrl].join(':');
     document.body.appendChild(link);
     link.click();
-    document.body.removeChild(link);
+    setTimeout(() => {
+      document.body.removeChild(link);
+      URL.revokeObjectURL(blobUrl);
+    }, 2000);
   };
 
   // ============================================================================
@@ -218,12 +223,12 @@ export function PavtiShareModal({
       }
 
       // Fallback for mobile/desktop browsers where direct file sharing is not supported:
-      // Download the exact same PNG image and open WhatsApp with pre-filled text
-      triggerDownload(imgData.dataUrl, imgData.fileName);
+      // Download the exact same PNG photo and open WhatsApp with pre-filled text
+      triggerDownload(imgData.blob, imgData.fileName);
       setShareFeedback(
         isEn
-          ? '✓ Receipt image downloaded! Opening WhatsApp...'
-          : '✓ पावती फोटो डाउनलोड झाला! WhatsApp उघडत आहे...'
+          ? '✓ Receipt photo saved to gallery/downloads! Opening WhatsApp...'
+          : '✓ पावती फोटो गॅलरी/डाऊनलोड्समध्ये सेव्ह झाला! WhatsApp उघडत आहे...'
       );
 
       setTimeout(() => {
@@ -239,7 +244,7 @@ export function PavtiShareModal({
   };
 
   // ============================================================================
-  // 2. DOWNLOAD RECEIPT IMAGE (Exact same PNG image)
+  // 2. DOWNLOAD RECEIPT IMAGE (Exact same PNG image saved to gallery/downloads)
   // ============================================================================
   const handleDownloadImage = async () => {
     try {
@@ -250,7 +255,7 @@ export function PavtiShareModal({
         return;
       }
 
-      triggerDownload(imgData.dataUrl, imgData.fileName);
+      triggerDownload(imgData.blob, imgData.fileName);
       setDownloadSuccess(true);
       setTimeout(() => setDownloadSuccess(false), 3500);
     } catch (err) {
