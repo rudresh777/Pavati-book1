@@ -445,6 +445,66 @@
         "details": "खर्च हटवला: EXP-001 (ढोल / बँड - ₹95000) दिनांक 2026-09-13.",
         "mode": "LIVE",
         "timestamp": "2026-08-22T19:08:17.661Z"
+      },
+      {
+        "userId": "user-admin-1",
+        "userName": "सुपर ॲडमिन",
+        "userRole": "SUPER_ADMIN",
+        "action": "PASSWORD_CHANGED",
+        "entityType": "USER",
+        "entityId": "host-1",
+        "details": "Super Admin (सुपर ॲडमिन) changed password for HOST account \"मंडळ प्रतिनिधी (Field Host)\" (host@mandal.org).",
+        "mode": "LIVE",
+        "id": "audit-1787434618093-07n9",
+        "timestamp": "2026-08-22T21:36:58.093Z"
+      },
+      {
+        "userId": "user-admin-1",
+        "userName": "सुपर ॲडमिन",
+        "userRole": "SUPER_ADMIN",
+        "action": "PASSWORD_CHANGED",
+        "entityType": "USER",
+        "entityId": "host-1",
+        "details": "Super Admin (सुपर ॲडमिन) changed password for HOST account \"मंडळ प्रतिनिधी (Field Host)\" (host@mandal.org).",
+        "mode": "LIVE",
+        "id": "audit-1787434693881-j1xz",
+        "timestamp": "2026-08-22T21:38:13.881Z"
+      },
+      {
+        "userId": "user-admin-1",
+        "userName": "सुपर ॲडमिन",
+        "userRole": "SUPER_ADMIN",
+        "action": "PASSWORD_CHANGED",
+        "entityType": "USER",
+        "entityId": "host-1",
+        "details": "Super Admin (सुपर ॲडमिन) changed password for HOST account \"मंडळ प्रतिनिधी (Field Host)\" (host@mandal.org).",
+        "mode": "LIVE",
+        "id": "audit-1787434696423-9ytw",
+        "timestamp": "2026-08-22T21:38:16.423Z"
+      },
+      {
+        "userId": "user-admin-1",
+        "userName": "सुपर ॲडमिन",
+        "userRole": "SUPER_ADMIN",
+        "action": "PASSWORD_CHANGED",
+        "entityType": "USER",
+        "entityId": "host-1",
+        "details": "Super Admin (सुपर ॲडमिन) changed password for HOST account \"मंडळ प्रतिनिधी (Field Host)\" (host@mandal.org).",
+        "mode": "LIVE",
+        "id": "audit-1787434754282-jly0",
+        "timestamp": "2026-08-22T21:39:14.282Z"
+      },
+      {
+        "userId": "user-admin-1",
+        "userName": "सुपर ॲडमिन",
+        "userRole": "SUPER_ADMIN",
+        "action": "PASSWORD_CHANGED",
+        "entityType": "USER",
+        "entityId": "host-1",
+        "details": "Super Admin (सुपर ॲडमिन) changed password for HOST account \"मंडळ प्रतिनिधी (Field Host)\" (host@mandal.org).",
+        "mode": "LIVE",
+        "id": "audit-1787434757371-c26d",
+        "timestamp": "2026-08-22T21:39:17.371Z"
       }
     ],
     "lastReceiptNumber": 5
@@ -529,12 +589,13 @@
     {
       "id": "host-1",
       "email": "host@mandal.org",
-      "passwordHash": "$2a$10$mqpl/JXOCjTIvTEy6BwUeuCsjkHw30f3f2w37/4KwXkL3IcTzNnNO",
+      "passwordHash": "$2a$10$xNvv4HIduhdnYn7TIKfV2eBFrAiELU1w6HXeb1djuFu8SnHM2Gtfy",
       "name": "मंडळ प्रतिनिधी (Field Host)",
       "role": "HOST",
       "phone": "9822000000",
       "active": true,
-      "createdAt": "2026-08-15T00:00:00.000Z"
+      "createdAt": "2026-08-15T00:00:00.000Z",
+      "updatedAt": "2026-08-22T21:39:17.343Z"
     }
   ],
   "announcements": [

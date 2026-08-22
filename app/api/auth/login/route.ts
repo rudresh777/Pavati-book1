@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server';
 import bcrypt from 'bcryptjs';
+import { createClient } from '@supabase/supabase-js';
+import ws from 'ws';
 import { getStorageProvider } from '@/lib/storage';
 import { createSession } from '@/lib/auth/session';
 
@@ -32,11 +34,14 @@ export async function POST(request: Request) {
     // 1. Try Supabase Auth verification if configured
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
     const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+    let authAttempted = false;
+
     if (supabaseUrl && supabaseAnonKey) {
       try {
-        const { createClient } = await import('@supabase/supabase-js');
+        authAttempted = true;
         const authClient = createClient(supabaseUrl, supabaseAnonKey, {
           auth: { persistSession: false, autoRefreshToken: false },
+          realtime: { transport: ws as any },
         });
         const { data: authData, error: authErr } = await authClient.auth.signInWithPassword({
           email: cleanEmail,
@@ -44,25 +49,29 @@ export async function POST(request: Request) {
         });
         if (!authErr && authData?.user) {
           isMatch = true;
+        } else if (authErr) {
+          // If Supabase Auth explicitly rejects the password as invalid credentials, do not fall back
+          if (
+            authErr.message?.toLowerCase().includes('invalid login credentials') ||
+            authErr.status === 400
+          ) {
+            isMatch = false;
+            authAttempted = true;
+          }
         }
       } catch (authErr) {
-        console.warn('[Supabase Auth Login] fallback to hash check:', authErr);
+        console.warn('[Supabase Auth Login] error connecting to Auth, falling back to hash check:', authErr);
+        authAttempted = false;
       }
     }
 
-    // 2. Hash verification fallback
-    if (!isMatch && user.passwordHash) {
+    // 2. Hash verification fallback (only if Supabase Auth was not used or in local mode)
+    if (!isMatch && !authAttempted && user.passwordHash) {
       try {
         isMatch = await bcrypt.compare(password.trim(), user.passwordHash);
       } catch {
         isMatch = false;
       }
-    }
-
-    // 3. Fallback for initial demo accounts only if not yet reset
-    if (!isMatch && !user.passwordHash) {
-      if (cleanEmail === 'admin@mandal.org' && password === 'admin123') isMatch = true;
-      if (cleanEmail === 'host@mandal.org' && password === 'host123') isMatch = true;
     }
 
     if (!isMatch) {

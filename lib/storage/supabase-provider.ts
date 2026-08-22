@@ -15,6 +15,7 @@ import {
   PaymentInstallment,
   UserRole,
 } from '@/types';
+import bcrypt from 'bcryptjs';
 import { IStorageProvider, DatabaseBackup } from './types';
 import { LocalStorageProvider } from './local-provider';
 import { getSupabaseServerClient, isSupabaseServerConfigured } from '@/lib/supabase/server';
@@ -222,9 +223,14 @@ export class SupabaseStorageProvider implements IStorageProvider {
       throw new Error('वापरकर्ता सापडला नाही (User not found).');
     }
 
+    const passwordHash = await bcrypt.hash(newPassword.trim(), 10);
+
     // Always update fallback local provider
     try {
-      await this.fallbackProvider.updateUserPassword(userId, newPassword, performedBy);
+      const localUser = (await this.fallbackProvider.getUserById(userId)) || (await this.fallbackProvider.getUserByEmail(targetUser.email));
+      if (localUser) {
+        await this.fallbackProvider.updateUserPassword(localUser.id, newPassword, performedBy);
+      }
     } catch (fbErr) {
       console.warn('[SupabaseStorageProvider] Fallback password update notice:', fbErr);
     }
@@ -234,7 +240,7 @@ export class SupabaseStorageProvider implements IStorageProvider {
     try {
       const client = this.getClient();
 
-      // Update password directly in Supabase Auth using Supabase Admin Auth API
+      // 1. Update password directly in Supabase Auth using Supabase Admin Auth API
       const { data: authUsers, error: listErr } = await client.auth.admin.listUsers();
       if (!listErr && authUsers && authUsers.users) {
         const authUser = authUsers.users.find(
@@ -243,7 +249,7 @@ export class SupabaseStorageProvider implements IStorageProvider {
 
         if (authUser) {
           const { error: updateAuthErr } = await client.auth.admin.updateUserById(authUser.id, {
-            password: newPassword,
+            password: newPassword.trim(),
             user_metadata: {
               name: targetUser.name,
               role: targetUser.role,
@@ -253,7 +259,7 @@ export class SupabaseStorageProvider implements IStorageProvider {
         } else {
           const { error: createAuthErr } = await client.auth.admin.createUser({
             email: targetUser.email,
-            password: newPassword,
+            password: newPassword.trim(),
             email_confirm: true,
             user_metadata: {
               name: targetUser.name,
@@ -264,11 +270,18 @@ export class SupabaseStorageProvider implements IStorageProvider {
         }
       }
 
-      // Update timestamp on users table
-      await client
+      // 2. Update password_hash and updated_at on public.users table in Supabase
+      const { error: userTableErr } = await client
         .from('users')
-        .update({ updated_at: new Date().toISOString() })
+        .update({
+          password_hash: passwordHash,
+          updated_at: new Date().toISOString(),
+        })
         .eq('id', userId);
+
+      if (userTableErr) {
+        console.error('[SupabaseStorageProvider] users table update error:', userTableErr.message);
+      }
 
       await this.addAuditLog({
         userId: performedBy.userId,
