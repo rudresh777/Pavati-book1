@@ -135,6 +135,7 @@ export function PavtiShareModal({
     }
 
     const node =
+      document.getElementById('share-modal-export-source') ||
       document.getElementById(elementId) ||
       document.getElementById('modal-pavti-preview-element') ||
       document.getElementById('view-pavti-element') ||
@@ -543,6 +544,15 @@ export function PavtiShareModal({
           <div className="p-3 bg-stone-50 rounded-xl border border-stone-200 text-xs font-devanagari text-stone-800 whitespace-pre-wrap font-medium leading-relaxed max-h-36 overflow-y-auto">
             {generateWhatsAppMessage()}
           </div>
+        </div>
+
+        {/* Offscreen pristine unscaled PavtiCard source for 100% full-resolution JPEG canvas export */}
+        <div className="fixed left-[-9999px] top-[-9999px] pointer-events-none" aria-hidden="true">
+          <PavtiCard
+            id="share-modal-export-source"
+            pavti={pavti}
+            settings={settings}
+          />
         </div>
       </div>
     </Modal>

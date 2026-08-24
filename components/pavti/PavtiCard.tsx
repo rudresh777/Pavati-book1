@@ -220,11 +220,7 @@ export function PavtiCard({
             {/* RIGHT 5-COLUMNS: DEDICATED VISUAL GANPATI ARTWORK PANEL */}
             <div className="col-span-12 sm:col-span-5 flex justify-center sm:justify-end">
               <div
-                className="relative w-full max-w-[210px] sm:max-w-[230px] h-[180px] sm:h-[210px] rounded-2xl overflow-hidden border-2 border-[#d6aa65]/70 shadow-md flex items-center justify-center"
-                style={{
-                  background:
-                    'radial-gradient(circle at 50% 35%, rgba(254, 243, 199, 0.9) 0%, rgba(255, 251, 235, 0.8) 55%, #fffdf8 100%)',
-                }}
+                className="relative w-full max-w-[210px] sm:max-w-[230px] h-[180px] sm:h-[210px] rounded-2xl overflow-hidden border-2 border-[#d6aa65]/70 shadow-md flex items-center justify-center bg-[#fffdf8]"
               >
                 {/* Radiant Golden Sunburst Glow Behind Ganpati */}
                 <div
@@ -235,20 +231,38 @@ export function PavtiCard({
                   }}
                 />
 
-                {/* Exact Ganpati Idol Artwork (Fully Visible, High-Resolution, Perfectly Framed) */}
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={GANPATI_IMAGE_DATA_URI}
-                  alt="श्री गणपती बाप्पा"
-                  className="w-full h-full object-cover object-[center_12%] transition-transform duration-300"
+                {/* 100% Reliable Multi-Layer Ganpati Idol Artwork for WebKit/Safari foreignObject & Canvas */}
+                {/* Layer 1: Native SVG Image (Always rendered synchronously by WebKit & Safari canvas) */}
+                <svg
+                  viewBox="0 0 300 300"
+                  className="w-full h-full absolute inset-0 z-10"
+                  preserveAspectRatio="xMidYMid slice"
+                >
+                  <image
+                    href={GANPATI_IMAGE_DATA_URI}
+                    xlinkHref={GANPATI_IMAGE_DATA_URI}
+                    x="0"
+                    y="0"
+                    width="300"
+                    height="300"
+                    preserveAspectRatio="xMidYMin slice"
+                  />
+                </svg>
+
+                {/* Layer 2: CSS Background Image */}
+                <div
+                  className="w-full h-full absolute inset-0 z-10 pointer-events-none"
                   style={{
-                    filter: 'contrast(1.05) saturate(1.08)',
+                    backgroundImage: `url("${GANPATI_IMAGE_DATA_URI}")`,
+                    backgroundSize: 'cover',
+                    backgroundPosition: 'center 12%',
+                    backgroundRepeat: 'no-repeat',
                   }}
                 />
 
                 {/* Subtle soft edge gradient transitions */}
-                <div className="absolute inset-0 bg-gradient-to-t from-[#fffdf8]/60 via-transparent to-transparent pointer-events-none" />
-                <div className="absolute inset-0 rounded-2xl border border-amber-400/40 pointer-events-none" />
+                <div className="absolute inset-0 bg-gradient-to-t from-[#fffdf8]/60 via-transparent to-transparent pointer-events-none z-20" />
+                <div className="absolute inset-0 rounded-2xl border border-amber-400/40 pointer-events-none z-20" />
               </div>
             </div>
           </div>
