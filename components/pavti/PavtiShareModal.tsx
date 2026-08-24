@@ -188,11 +188,11 @@ export function PavtiShareModal({
   };
 
   // ============================================================================
-  // 1. SAVE TO PHONE GALLERY / PHOTOS (Real JPEG photo via Native Share / Download)
-  // On iOS Safari: Opens native sheet with "Save Image" to save directly to Camera Roll/Photos
-  // On Android/Desktop: Saves/downloads Pavti_000005.jpg directly
+  // 1. SAVE / DOWNLOAD RECEIPT PHOTO (NATIVE iOS/Android SHARE SHEET OR DIRECT DOWNLOAD)
+  // On iPhone / Mobile: Opens native iOS Share Sheet with JPEG file -> User selects "Save Image" (saves directly to Photos app/Camera Roll)
+  // On Desktop / Fallback: Downloads Pavti_<number>.jpg directly
   // ============================================================================
-  const handleSaveToGallery = async () => {
+  const handleDownloadImage = async () => {
     try {
       setIsGenerating(true);
       setShareFeedback('');
@@ -203,7 +203,7 @@ export function PavtiShareModal({
         return;
       }
 
-      // Check if native file sharing is supported on this browser (Mobile Safari, Chrome Android, etc.)
+      // Check if native file sharing is supported on this browser (Mobile Safari on iPhone, Chrome Android, etc.)
       const canShareFiles =
         typeof navigator !== 'undefined' &&
         'share' in navigator &&
@@ -226,42 +226,20 @@ export function PavtiShareModal({
           return;
         } catch (shareErr: any) {
           if (shareErr.name === 'AbortError') {
+            // User cancelled/closed the native share sheet
             return;
           }
           console.warn('Native share error, falling back to direct download:', shareErr);
         }
       }
 
-      // Fallback: direct download as real JPEG (.jpg) photo
+      // Desktop / fallback: direct download as real JPEG (.jpg) photo
       triggerDownload(imgData.blob, imgData.fileName);
       setDownloadSuccess(true);
       setTimeout(() => setDownloadSuccess(false), 3500);
     } catch (err) {
-      console.error('Failed to save Pavti image:', err);
+      console.error('Failed to download/save Pavti image:', err);
       alert(isEn ? 'Failed to save receipt image.' : 'पावती फोटो सेव्ह करण्यात अडचण आली.');
-    } finally {
-      setIsGenerating(false);
-    }
-  };
-
-  // ============================================================================
-  // 2. DOWNLOAD RECEIPT IMAGE (.JPG photo file)
-  // ============================================================================
-  const handleDownloadImage = async () => {
-    try {
-      setIsGenerating(true);
-      const imgData = await getOrCreateReceiptImage();
-      if (!imgData) {
-        alert(isEn ? 'Could not generate receipt image.' : 'पावती फोटो तयार करता आला नाही.');
-        return;
-      }
-
-      triggerDownload(imgData.blob, imgData.fileName);
-      setDownloadSuccess(true);
-      setTimeout(() => setDownloadSuccess(false), 3500);
-    } catch (err) {
-      console.error('Failed to download Pavti image:', err);
-      alert(isEn ? 'Failed to download receipt image.' : 'पावती फोटो डाउनलोड करण्यात अडचण आली.');
     } finally {
       setIsGenerating(false);
     }
@@ -448,7 +426,7 @@ export function PavtiShareModal({
 
           {/* Secondary 2-Column Actions */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-            {/* Download Photo to Gallery (.JPG) */}
+            {/* Save / Download Photo to Photos/Gallery (.JPG) */}
             <button
               type="button"
               onClick={handleDownloadImage}
@@ -456,7 +434,7 @@ export function PavtiShareModal({
               className="flex items-center justify-center gap-2 p-3 bg-gradient-to-r from-amber-600 to-amber-700 hover:from-amber-700 hover:to-amber-800 active:scale-[0.98] text-white rounded-xl shadow font-devanagari font-bold text-xs sm:text-sm transition-all border border-amber-800 cursor-pointer"
             >
               <Download className="w-4 h-4 text-white flex-shrink-0" />
-              <span>{isEn ? 'Download Photo (.JPG)' : 'पावती फोटो डाउनलोड करा (.JPG)'}</span>
+              <span>{isEn ? 'Save / Download Photo (.JPG)' : 'पावती फोटो सेव्ह करा (.JPG)'}</span>
             </button>
 
             {/* Copy Receipt Image (Desktop / WhatsApp Web / iPhone) */}
