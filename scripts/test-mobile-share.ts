@@ -47,19 +47,19 @@ async function runMobileShareTests() {
   }
   console.log('   ✅ PASS: Official WhatsApp Group Link confirmed.\n');
 
-  // Test Filename formatting
+  // Test Filename formatting (real JPEG photo: Pavti_000005.jpg)
   console.log('2. Testing Filename generation for various receipt numbers:');
   const testReceiptNumbers = ['000001', '#000002', '000005', 'GPB-000010'];
   for (const rNo of testReceiptNumbers) {
     const cleanReceiptNo = rNo.replace(/^#/, '').replace(/[^a-zA-Z0-9_-]/g, '_');
-    const fileName = `Pavti_${cleanReceiptNo}.png`;
+    const fileName = `Pavti_${cleanReceiptNo}.jpg`;
     console.log(`   Receipt ${rNo} -> Filename: ${fileName}`);
-    if (!fileName.endsWith('.png') || !fileName.startsWith('Pavti_')) {
+    if (!fileName.endsWith('.jpg') || !fileName.startsWith('Pavti_')) {
       console.error('❌ ERROR: Invalid filename format:', fileName);
       process.exit(1);
     }
   }
-  console.log('   ✅ PASS: Dynamic meaningful PNG filenames verified.\n');
+  console.log('   ✅ PASS: Dynamic meaningful JPEG (.jpg) filenames verified.\n');
 
   // Test Paid Receipt Message
   console.log('3. Testing Paid Receipt WhatsApp Message (Receipt #000005, ₹501):');

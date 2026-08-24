@@ -53,7 +53,7 @@ async function runVerification() {
   const donor1 = await storage.saveDonor({
     id: 'donor-test-1',
     name: 'राहुल पाटील (Rahul Patil)',
-    mobile: '9876543210',
+    mobile: '',
     address: 'तापडिया नगर, अकोला',
     totalContributed: 0,
     pavtiCount: 0,
@@ -103,7 +103,7 @@ async function runVerification() {
     numericReceiptNumber: n1,
     donorId: 'donor-test-2',
     donorName: 'सचिन जोशी (Sachin Joshi)',
-    donorMobile: '9876543211',
+    donorMobile: '',
     expectedAmount: 1001,
     receivedAmount: 1001,
     remainingAmount: 0,

@@ -10,7 +10,7 @@
 1. **Digital Pavti Book Engine**:
    - Traditional printed receipt book digital aesthetic with Devanagari typography ("॥ श्री गणेशाय नमः ॥", "॥ गणपती बाप्पा मोरया ॥").
    - Real-time **Devanagari Marathi and English** amount-in-words converter (e.g. ₹ 501 $\rightarrow$ *"पाचशे एक रुपये फक्त"*).
-   - High-resolution **PNG image export** for instant mobile downloads.
+   - High-resolution **real JPEG/JPG photo export** for instant mobile downloads and clipboard sharing.
    - **No fake or physical signatures** — uses an authentic digital "PAID / जमा" stamp and collector name.
 
 2. **Sequential Transaction-Safe Receipt Numbering**:
@@ -92,7 +92,7 @@ Open [http://localhost:3000](http://localhost:3000) in your browser.
 │   ├── ui/                       # Accessible Button, Input, Modal, Card, Badge
 │   ├── pavti/
 │   │   ├── PavtiCard.tsx         # Traditional printed receipt component
-│   │   └── PavtiShareModal.tsx   # PNG Generator & WhatsApp share
+│   │   └── PavtiShareModal.tsx   # JPEG Generator & WhatsApp share
 │   └── layout/
 │       ├── Navbar.tsx            # Responsive navigation & mobile drawer
 │       ├── Footer.tsx            # Public & Private footer
