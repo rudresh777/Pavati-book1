@@ -188,21 +188,20 @@ export function PavtiShareModal({
   };
 
   // ============================================================================
-  // 1. MOBILE & DIRECT SHARE (Web Share API with JPEG file + fallback to Download & Open)
+  // 1. SAVE TO PHONE GALLERY / PHOTOS (Real JPEG photo via Native Share / Download)
+  // On iOS Safari: Opens native sheet with "Save Image" to save directly to Camera Roll/Photos
+  // On Android/Desktop: Saves/downloads Pavti_000005.jpg directly
   // ============================================================================
-  const handleShareOnWhatsApp = async () => {
-    setIsGenerating(true);
-    setShareFeedback('');
-
+  const handleSaveToGallery = async () => {
     try {
+      setIsGenerating(true);
+      setShareFeedback('');
+
       const imgData = await getOrCreateReceiptImage();
       if (!imgData) {
         alert(isEn ? 'Could not generate receipt image.' : 'पावती फोटो तयार करता आला नाही.');
         return;
       }
-
-      const messageText = generateWhatsAppMessage();
-      const mandalName = settings?.mandalNameMarathi || 'मोरया गणेशोत्सव मंडळ';
 
       // Check if native file sharing is supported on this browser (Mobile Safari, Chrome Android, etc.)
       const canShareFiles =
@@ -216,44 +215,37 @@ export function PavtiShareModal({
         try {
           await navigator.share({
             files: [imgData.file],
-            title: `${mandalName} - ${receiptNoFormatted}`,
-            text: messageText,
+            title: `${settings?.mandalNameMarathi || 'मोरया गणेशोत्सव मंडळ'} - ${receiptNoFormatted}`,
           });
-          setShareFeedback(isEn ? '✓ Shared successfully!' : '✓ पावती यशस्वीरित्या शेअर केली!');
+          setShareFeedback(
+            isEn
+              ? '✓ Receipt photo saved / shared successfully!'
+              : '✓ पावती फोटो गॅलरीत सेव्ह / शेअर झाला!'
+          );
           setTimeout(() => setShareFeedback(''), 4000);
           return;
         } catch (shareErr: any) {
           if (shareErr.name === 'AbortError') {
-            // User cancelled native share sheet
             return;
           }
-          console.warn('Native file share failed, falling back to download + WhatsApp deep link:', shareErr);
+          console.warn('Native share error, falling back to direct download:', shareErr);
         }
       }
 
-      // Fallback for mobile/desktop browsers where direct file sharing is not supported:
-      // Download the exact same JPEG photo and open WhatsApp with pre-filled text
+      // Fallback: direct download as real JPEG (.jpg) photo
       triggerDownload(imgData.blob, imgData.fileName);
-      setShareFeedback(
-        isEn
-          ? '✓ Receipt photo saved to gallery/downloads! Opening WhatsApp...'
-          : '✓ पावती फोटो गॅलरी/डाऊनलोड्समध्ये सेव्ह झाला! WhatsApp उघडत आहे...'
-      );
-
-      setTimeout(() => {
-        handleOpenWhatsApp();
-        setShareFeedback('');
-      }, 1200);
-    } catch (err: any) {
-      console.error('Share error:', err);
-      alert(isEn ? 'Failed to share receipt.' : 'पावती शेअर करताना अडचण आली.');
+      setDownloadSuccess(true);
+      setTimeout(() => setDownloadSuccess(false), 3500);
+    } catch (err) {
+      console.error('Failed to save Pavti image:', err);
+      alert(isEn ? 'Failed to save receipt image.' : 'पावती फोटो सेव्ह करण्यात अडचण आली.');
     } finally {
       setIsGenerating(false);
     }
   };
 
   // ============================================================================
-  // 2. DOWNLOAD RECEIPT IMAGE (Exact same JPEG photo saved to gallery/downloads)
+  // 2. DOWNLOAD RECEIPT IMAGE (.JPG photo file)
   // ============================================================================
   const handleDownloadImage = async () => {
     try {
@@ -269,7 +261,7 @@ export function PavtiShareModal({
       setTimeout(() => setDownloadSuccess(false), 3500);
     } catch (err) {
       console.error('Failed to download Pavti image:', err);
-      alert(isEn ? 'Failed to download receipt image.' : 'पावती इमेज डाऊनलोड करण्यात अडचण आली.');
+      alert(isEn ? 'Failed to download receipt image.' : 'पावती फोटो डाउनलोड करण्यात अडचण आली.');
     } finally {
       setIsGenerating(false);
     }
@@ -321,9 +313,10 @@ export function PavtiShareModal({
   };
 
   // ============================================================================
-  // 4. OPEN WHATSAPP CHAT
+  // 4. DIRECT WHATSAPP CHAT URL GENERATOR
+  // Uses donor's mobile number and pre-filled message + group link
   // ============================================================================
-  const handleOpenWhatsApp = () => {
+  const getWhatsAppDirectUrl = () => {
     const messageText = generateWhatsAppMessage();
     const encodedMsg = encodeURIComponent(messageText);
 
@@ -340,10 +333,13 @@ export function PavtiShareModal({
       phoneWithCountry = cleanPhone;
     }
 
-    const targetUrl = phoneWithCountry
+    return phoneWithCountry
       ? `https://api.whatsapp.com/send?phone=${phoneWithCountry}&text=${encodedMsg}`
       : `https://api.whatsapp.com/send?text=${encodedMsg}`;
+  };
 
+  const handleOpenWhatsApp = () => {
+    const targetUrl = getWhatsAppDirectUrl();
     window.open(targetUrl, '_blank', 'noopener,noreferrer');
   };
 
@@ -392,8 +388,8 @@ export function PavtiShareModal({
             <CheckCircle2 className="w-4 h-4 text-teal-600 flex-shrink-0" />
             <span className="font-bold">
               {isEn
-                ? `✓ Receipt image downloaded successfully (Pavti_${(pavti.receiptNumber || '000001').replace(/^#/, '')}.jpg)`
-                : `✓ पावती फोटो यशस्वीरित्या डाउनलोड झाला (Pavti_${(pavti.receiptNumber || '000001').replace(/^#/, '')}.jpg)`}
+                ? `✓ Receipt photo saved/downloaded successfully (Pavti_${(pavti.receiptNumber || '000001').replace(/^#/, '')}.jpg)`
+                : `✓ पावती फोटो यशस्वीरित्या सेव्ह/डाउनलोड झाला (Pavti_${(pavti.receiptNumber || '000001').replace(/^#/, '')}.jpg)`}
             </span>
           </div>
         )}
@@ -403,12 +399,12 @@ export function PavtiShareModal({
             <CheckCircle2 className="w-4 h-4 text-emerald-600 flex-shrink-0 mt-0.5" />
             <div>
               <span className="font-bold">
-                {isEn ? '✓ Pavti image copied to clipboard!' : '✓ पावती फोटो क्लिपबोर्डवर कॉपी झाला!'}
+                {isEn ? '✓ Pavti photo copied to clipboard!' : '✓ पावती फोटो क्लिपबोर्डवर कॉपी झाला!'}
               </span>
-              <p className="text-[11px] text-emerald-800 pt-0.5">
+              <p className="text-[11px] text-emerald-800 pt-0.5 font-medium">
                 {isEn
-                  ? 'Now open WhatsApp and paste (Ctrl+V / Long-press Paste) to send the receipt photo.'
-                  : 'आता WhatsApp उघडा आणि चॅटमध्ये पेस्ट (Ctrl+V / दाबून धरून Paste) करून पावती पाठवा.'}
+                  ? 'Now tap "Open Donor WhatsApp Chat" below and paste (Ctrl+V / Long-press Paste) to send.'
+                  : 'आता खालील "WhatsApp चॅट उघडा" बटणावर क्लिक करून चॅटमध्ये पेस्ट (Ctrl+V / दाबून Paste) करून पावती पाठवा.'}
               </p>
             </div>
           </div>
@@ -420,8 +416,8 @@ export function PavtiShareModal({
               <AlertCircle className="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5" />
               <p className="leading-relaxed">
                 {isEn
-                  ? 'Image copying is not supported by this browser. Please use "Download Receipt Image" or "Share on WhatsApp" below.'
-                  : 'या ब्राऊझरवर थेट फोटो क्लिपबोर्ड कॉपी उपलब्ध नाही. कृपया खालील "पावती फोटो डाउनलोड करा" किंवा "WhatsApp वर शेअर करा" वापरा.'}
+                  ? 'Direct clipboard copying is not supported on this browser. Please use "Save Photo to Gallery" or "Open Donor WhatsApp Chat" below.'
+                  : 'या ब्राऊझरवर थेट क्लिपबोर्ड कॉपी उपलब्ध नाही. कृपया खालील "पावती फोटो गॅलरीत सेव्ह करा" किंवा "WhatsApp चॅट उघडा" वापरा.'}
               </p>
             </div>
           </div>
@@ -431,34 +427,28 @@ export function PavtiShareModal({
             PRIMARY ACTIONS (MOBILE & DESKTOP SUITE)
             ======================================================= */}
         <div className="space-y-2.5">
-          {/* Main WhatsApp Share Button */}
-          <button
-            type="button"
-            onClick={handleShareOnWhatsApp}
-            disabled={isGenerating}
-            className="w-full flex items-center justify-center gap-2 p-3.5 bg-emerald-600 hover:bg-emerald-700 active:scale-[0.98] text-white rounded-xl shadow-md font-devanagari font-bold text-sm sm:text-base transition-all border border-emerald-700 cursor-pointer"
+          {/* Main Direct WhatsApp Chat Button - Directly opens WhatsApp to send text message */}
+          <a
+            href={getWhatsAppDirectUrl()}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="w-full flex items-center justify-center gap-2 p-3.5 bg-emerald-600 hover:bg-emerald-700 active:scale-[0.98] text-white rounded-xl shadow-md font-devanagari font-bold text-sm sm:text-base transition-all border border-emerald-700 cursor-pointer no-underline"
           >
-            {isGenerating ? (
-              <span className="flex items-center gap-2">
-                <span className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent" />
-                <span>{isEn ? 'Preparing Receipt...' : 'पावती तयार होत आहे...'}</span>
+            <Send className="w-5 h-5 text-white flex-shrink-0" />
+            <span>
+              {isEn ? 'Open WhatsApp & Send Message' : 'WhatsApp वर मेसेज पाठवा'}
+            </span>
+            {pavti.donorMobile && (
+              <span className="text-[11px] font-mono bg-emerald-800/80 px-2.5 py-0.5 rounded-md ml-1 border border-emerald-500/30">
+                {pavti.donorMobile}
               </span>
-            ) : (
-              <>
-                <Send className="w-5 h-5 text-white flex-shrink-0" />
-                <span>{isEn ? 'Share on WhatsApp' : 'WhatsApp वर शेअर करा'}</span>
-                {pavti.donorMobile && (
-                  <span className="text-[11px] font-mono bg-emerald-800/70 px-2 py-0.5 rounded ml-1">
-                    {pavti.donorMobile}
-                  </span>
-                )}
-              </>
             )}
-          </button>
+            <ExternalLink className="w-4 h-4 ml-0.5 opacity-90" />
+          </a>
 
           {/* Secondary 2-Column Actions */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-            {/* Download Receipt Image */}
+            {/* Download Photo to Gallery (.JPG) */}
             <button
               type="button"
               onClick={handleDownloadImage}
@@ -466,7 +456,7 @@ export function PavtiShareModal({
               className="flex items-center justify-center gap-2 p-3 bg-gradient-to-r from-amber-600 to-amber-700 hover:from-amber-700 hover:to-amber-800 active:scale-[0.98] text-white rounded-xl shadow font-devanagari font-bold text-xs sm:text-sm transition-all border border-amber-800 cursor-pointer"
             >
               <Download className="w-4 h-4 text-white flex-shrink-0" />
-              <span>{isEn ? 'Download Receipt Image' : 'पावती फोटो डाउनलोड करा'}</span>
+              <span>{isEn ? 'Download Photo (.JPG)' : 'पावती फोटो डाउनलोड करा (.JPG)'}</span>
             </button>
 
             {/* Copy Receipt Image (Desktop / WhatsApp Web / iPhone) */}
@@ -477,7 +467,7 @@ export function PavtiShareModal({
               className="flex items-center justify-center gap-2 p-3 bg-stone-800 hover:bg-stone-900 active:scale-[0.98] text-white rounded-xl shadow font-devanagari font-bold text-xs sm:text-sm transition-all border border-stone-950 cursor-pointer"
             >
               <Copy className="w-4 h-4 text-amber-300 flex-shrink-0" />
-              <span>{isEn ? 'Copy Receipt Image' : 'पावती फोटो कॉपी करा'}</span>
+              <span>{isEn ? 'Copy Photo (Clipboard)' : 'पावती फोटो कॉपी करा'}</span>
             </button>
           </div>
         </div>
@@ -485,26 +475,26 @@ export function PavtiShareModal({
         {/* =======================================================
             WORKFLOW HELPER STRIP
             ======================================================= */}
-        <div className="p-2.5 bg-amber-50/80 border border-amber-200/80 rounded-xl text-[11px] font-devanagari text-amber-950 flex items-center justify-between gap-1 flex-wrap">
+        <div className="p-2.5 bg-amber-50/90 border border-amber-200/90 rounded-xl text-[11px] font-devanagari text-amber-950 flex items-center justify-between gap-1 flex-wrap">
           <span className="font-semibold">
-            {isEn ? '📱 Mobile Workflow:' : '📱 मोबाईल पद्धत:'}
+            {isEn ? '📱 2-Step Flow:' : '📱 २ सोप्या पायऱ्या:'}
           </span>
           <span className="text-stone-700">
             {isEn
-              ? 'Click "Share on WhatsApp" or "Download Receipt Image" ➔ Select in WhatsApp ➔ Send'
-              : '"WhatsApp वर शेअर करा" किंवा "पावती फोटो डाउनलोड करा" ➔ WhatsApp मध्ये फोटो जोडा ➔ पाठवा'}
+              ? '1. Download photo (.JPG) ➔ 2. Open WhatsApp & Send text ➔ 3. Send photo from gallery'
+              : '१. फोटो डाउनलोड करा (.JPG) ➔ २. WhatsApp वर मेसेज पाठवा ➔ ३. गॅलरीतून फोटो जोडून पाठवा'}
           </span>
         </div>
 
         {/* =======================================================
-            SECTION 3: VISUAL RECEIPT PHOTO PREVIEW
+            SECTION 3: VISUAL RECEIPT PHOTO PREVIEW (REAL JPEG IMAGE)
             Exact single-source image that is copied, downloaded & shared
             ======================================================= */}
         <div className="space-y-1.5 pt-1">
           <div className="flex items-center justify-between">
             <span className="text-xs font-bold text-stone-700 flex items-center gap-1.5 font-devanagari">
               <ImageIcon className="w-3.5 h-3.5 text-orange-600" />
-              <span>{isEn ? 'Receipt Image Preview (Single Source):' : 'पावती मूळ फोटो (सिंगल सोर्स):'}</span>
+              <span>{isEn ? 'Receipt Photo (Tap & Hold to Save):' : 'पावती मूळ फोटो (दाबून धरून सेव्ह करा):'}</span>
             </span>
             <button
               type="button"
@@ -517,14 +507,30 @@ export function PavtiShareModal({
             </button>
           </div>
 
-          <div className="bg-stone-100/80 p-2 sm:p-3 rounded-2xl border border-stone-200/80 max-h-60 sm:max-h-64 overflow-y-auto shadow-inner">
-            <div className="transform scale-[0.80] sm:scale-90 origin-top -mb-14 sm:-mb-6">
-              <PavtiCard
-                id="modal-pavti-preview-element"
-                pavti={pavti}
-                settings={settings}
-              />
-            </div>
+          <div className="bg-stone-100/80 p-2 sm:p-3 rounded-2xl border border-stone-200/80 max-h-72 sm:max-h-80 overflow-y-auto shadow-inner text-center">
+            {cachedImage?.dataUrl ? (
+              <div className="space-y-1.5">
+                {/* Real interactive JPEG photo for iPhone / Android native long-press save */}
+                <img
+                  src={cachedImage.dataUrl}
+                  alt={`Pavti #${pavti.receiptNumber}`}
+                  className="w-full max-w-[420px] mx-auto rounded-xl shadow-md border border-amber-300/60 select-auto touch-auto"
+                />
+                <p className="text-[10px] text-stone-500 font-devanagari">
+                  {isEn
+                    ? '💡 Tip: You can also touch & hold (long-press) the photo above to "Save to Photos" / "Add to Photos".'
+                    : '💡 टीप: वरील फोटोवर बोट दाबून धरून (Long-Press) थेट iPhone Photos किंवा Gallery मध्ये सेव्ह करू शकता.'}
+                </p>
+              </div>
+            ) : (
+              <div className="transform scale-[0.80] sm:scale-90 origin-top -mb-14 sm:-mb-6">
+                <PavtiCard
+                  id="modal-pavti-preview-element"
+                  pavti={pavti}
+                  settings={settings}
+                />
+              </div>
+            )}
           </div>
         </div>
 
